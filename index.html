@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en" data-ui="simple">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      // the panel tier before the first paint (the module runs later): no flash of the Advanced panel
+      try { if (JSON.parse(localStorage.getItem('midiviz_settings_v3') || '{}').uiMode === 'advanced') document.documentElement.dataset.ui = 'advanced' } catch (e) {}
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Growth — MIDI / music visualiser</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #000; color: #cfd3da; font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+      /* `hidden` must beat display:flex rows (mode rows, playlist, countdown); the search hides its own way */
+      [hidden], [data-search-hidden] { display: none !important; }
+      #stage { position: fixed; inset: 0; background: #000; }
+      #stage canvas { display: block; width: 100%; height: 100%; }
+      #panel {
+        position: fixed; top: 12px; left: 12px; width: min(370px, calc(100vw - 24px)); max-height: calc(100dvh - 70px); overflow: auto;
+        background: rgba(12, 13, 16, 0.86); border: 1px solid #2a2d35; border-radius: 10px; padding: 0 12px 10px;
+        backdrop-filter: blur(8px); transition: opacity 0.25s, transform 0.25s; scrollbar-width: thin; scrollbar-color: #46525c transparent;
+      }
+      /* title + reset stay pinned while the sections scroll under them */
+      #panelTop {
+        position: sticky; top: 0; z-index: 3; margin: 0 -12px; padding: 12px;
+        background: rgba(10, 11, 14, 0.97); border-bottom: 1px solid #262a33; border-radius: 9px 9px 0 0;
+      }
+      body.hide-ui #panel, body.hide-ui #hud { opacity: 0; pointer-events: none; transform: translateX(-8px); }
+      body.hide-cursor { cursor: none; }
+      /* anything floating over the stage: tag it .ui-overlay and it hides with the UI and in capture output */
+      body.hide-ui .ui-overlay, body.capture-output .ui-overlay { display: none !important; }
+      /* the way back when the UI is hidden; fades with the cursor, never part of a ?ui=0 capture */
+      #returnUi { display: none; position: fixed; top: 12px; left: 12px; z-index: 5; transition: opacity 0.3s; }
+      body.hide-ui #returnUi { display: block; }
+      body.hide-cursor #returnUi { opacity: 0; }
+      body.hide-ui #returnUi:hover, body.hide-ui #returnUi:focus-visible { opacity: 1; }
+      body.capture-output #returnUi { display: none; }
+      #panel h1 { font-size: 16px; margin: 0 0 6px; letter-spacing: 0.02em; }
+      #storageNote { color: #fd5; font-weight: 400; font-size: 12px; }
+      /* every section is a collapsible details block */
+      details.sec { border-top: 1px solid #23262e; margin-top: 6px; }
+      #panelTop + details.sec { border-top: 0; margin-top: 2px; }
+      details.sec > summary {
+        cursor: pointer; list-style: none; padding: 12px 2px 9px; font-size: 14px; color: #bac3d1;
+        text-transform: uppercase; letter-spacing: 0.08em; user-select: none; display: flex; align-items: center; gap: 6px;
+      }
+      details.sec > summary::-webkit-details-marker { display: none; }
+      details.sec > summary::before { content: '▸'; font-size: 9px; color: #5a6070; transition: transform 0.15s; }
+      details.sec[open] > summary::before { transform: rotate(90deg); }
+      details.sec > summary:hover { color: #cfd3da; }
+      details.sec > summary .hint { text-transform: none; letter-spacing: 0; color: #919aaa; font-size: 12px; margin-left: auto; }
+      details.sec .body { padding: 0 0 8px 2px; }
+      .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
+      .row label { display: flex; gap: 4px; align-items: center; }
+      button, select, input[type='file'] { font: inherit; }
+      button { background: #1b1f27; color: #dfe3ea; border: 1px solid #333846; border-radius: 6px; padding: 4px 9px; cursor: pointer; }
+      button:hover { background: #262b36; }
+      button.primary { background: #2c4a8a; border-color: #3e64b5; }
+      button.active { background: #3a5f2f; border-color: #5a8f47; }
+      select { background: #14171d; color: #dfe3ea; border: 1px solid #333846; border-radius: 6px; padding: 3px 6px; max-width: 100%; }
+      /* comfortable targets for the primary controls only; the icon / preset grids stay compact */
+      .row > button, .row > select, .row > label > select, #returnUi { min-height: 34px; }
+      button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #99ffcc; outline-offset: 3px; }
+      .slider { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 8px 0; }
+      .slider span.l { color: #aab1bd; }
+      .slider span.v { font: 12px ui-monospace, monospace; color: #9ad; text-align: right; }
+      .slider input { grid-column: 1 / span 2; width: 100%; margin: 0; min-height: 26px; accent-color: #8fe6b6; }
+      .engines { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+      .engines button { text-align: left; padding: 5px 8px; }
+      .engines button small { display: block; color: #8a93a3; font-size: 12px; }
+      .icons { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 4px 0; }
+      .icons button.icon { padding: 4px 1px 3px; text-align: center; opacity: 0.4; line-height: 1.1; }
+      .icons button.icon.active { opacity: 1; background: #2b3a2b; border-color: #4d7a45; }
+      .icons button.icon span { font-size: 17px; display: block; }
+      .icons button.icon small { font-size: 10px; color: #aab1bd; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; margin: 4px 0; }
+      .presets button { padding: 4px 0; font: 12px ui-monospace, monospace; }
+      .presets button.filled { border-color: #4d6aa5; color: #cfe; }
+      .presets button.current { background: #2c4a8a; }
+      .playlist { display: flex; flex-direction: column; gap: 2px; max-height: 108px; overflow: auto; margin: 4px 0; }
+      .playlist button { text-align: left; font-size: 12px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .slider.learn { outline: 1px solid #fd5; border-radius: 4px; }
+      .slider .cc { color: #fd5; font-size: 10px; margin-left: 4px; }
+      button.rec { background: #6a2020; border-color: #a33; }
+      input[type='text'], input[type='search'] { background: #14171d; color: #dfe3ea; border: 1px solid #333846; border-radius: 6px; padding: 3px 6px; font: inherit; }
+      .row > input[type='text'], .row > input[type='file'] { min-width: 0; max-width: 100%; }
+      #controlSearch { width: 100%; min-height: 36px; margin-top: 10px; }
+      #searchHelp { margin: 5px 0 0; font-size: 12px; color: #aab4c3; }
+      .note { color: #aab4c3; font-size: 13px; margin: 3px 0; }
+      button:disabled, input:disabled { opacity: 0.45; cursor: default; }
+      /* Simple / Advanced: one panel, tiers by attribute. A search shows every tier (it filters rows itself). */
+      html[data-ui='simple']:not([data-searching]) [data-tier='advanced'] { display: none !important; }
+      #uiTier { margin-left: auto; }
+      #uiTier[aria-pressed='true'] { background: #2b3a2b; border-color: #4d7a45; }
+      .looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin: 4px 0 6px; }
+      .intents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 4px 0; }
+      .looks button, .intents button { min-height: 34px; padding: 4px 6px; min-width: 0; }
+      /* macros: label, slider and value on one line (five knobs, compact in both tiers) */
+      .macros .slider { grid-template-columns: 7.8em minmax(0, 1fr) 2.6em; align-items: center; margin: 2px 0; }
+      .macros .slider input { grid-column: auto; order: 1; }
+      .macros .slider span.v { order: 2; }
+      .macros .slider span.l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #sec-make .sub { margin: 12px 0 2px; font-size: 12px; color: #919aaa; text-transform: uppercase; letter-spacing: 0.08em; }
+      #referenceTools { border: 1px solid #2f3d37; border-radius: 8px; padding: 2px 8px; margin: 6px 0; }
+      #referenceTools strong { color: #cfe8da; font-size: 13px; font-weight: 600; margin-right: auto; }
+      #referenceTools .slider { margin: 4px 0; }
+      #blurb { color: #aab4c3; font-size: 13px; margin: 4px 0 0; }
+      #status { color: #7fb; font: 12px ui-monospace, monospace; white-space: pre-wrap; margin-top: 4px; }
+      #hud {
+        position: fixed; left: 12px; bottom: 10px; max-width: calc(100vw - 24px); padding: 6px 10px; background: rgba(12, 13, 16, 0.7); border-radius: 8px;
+        font: 12px ui-monospace, monospace; color: #aab1bd; transition: opacity 0.25s; pointer-events: none;
+      }
+      #hud b { color: #dfe3ea; font-weight: 600; }
+      #meter { display: inline-block; width: 80px; height: 6px; background: #22262e; border-radius: 3px; vertical-align: middle; overflow: hidden; }
+      #meter i { display: block; height: 100%; background: linear-gradient(90deg, #4a8, #fd5); width: 0; }
+      kbd { background: #1b1f27; border: 1px solid #333846; border-radius: 4px; padding: 0 4px; font: 12px ui-monospace, monospace; color: #cfd3da; }
+      .keys { color: #aab4c3; font-size: 13px; line-height: 1.7; }
+      #drop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(20, 40, 80, 0.5); font-size: 22px; pointer-events: none; }
+      body.dragging #drop { display: flex; }
+      @media (max-width: 600px) {
+        #panel { top: 8px; left: 8px; width: min(370px, calc(100vw - 16px)); max-height: 60dvh; }
+        #hud { left: 8px; }
+        details.sec > summary .hint { max-width: 55%; text-align: right; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #panel, #hud, #returnUi, details.sec > summary::before { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="drop">drop audio · video · picture · a model (glb / obj / stl)</div>
+    <div id="countdown" hidden style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:bold 160px system-ui,sans-serif;color:#fff;text-shadow:0 0 40px #000;pointer-events:none"></div>
+
+    <!-- outside the panel: the panel is inert while hidden -->
+    <button id="returnUi" type="button" title="Esc, F2 or `">Show controls · Esc</button>
+
+    <div id="panel" role="region" aria-label="Growth controls">
+      <div id="panelTop">
+        <h1>Growth <span id="ver" style="color:#7fb;font-weight:400;font-size:11px"></span> <span style="color:#8a93a3;font-weight:400">— midi / music visualiser</span> <span id="storageNote" hidden title="browser storage is unavailable: settings and preset slots last for this session only">· session only</span></h1>
+        <div class="row" style="margin: 0">
+          <button id="clear" class="primary" title="Backspace">↺ reset</button>
+          <button id="perf" title="Enter">▶ performance</button>
+          <button id="hideUi" title="F2 or ` (the key left of 1)">hide UI</button>
+        </div>
+        <div class="row" style="margin: 5px 0 0">
+          <button id="record" title="R">● rec</button>
+          <select id="recMode" title="how a recording starts">
+            <option value="now">now</option>
+            <option value="count">3 s countdown</option>
+            <option value="note">on next note</option>
+          </select>
+          <button id="still" title="Q · shift+Q renders it at 2×">📷 still</button>
+        </div>
+        <div class="row" style="margin: 5px 0 0">
+          <button id="camCycle" title="C — next camera style · Shift+C previous">🎥 framed</button>
+          <button id="camLock" type="button" aria-pressed="false" title="V — freeze this view (Reset keeps it)">🔓 lock</button>
+          <button id="uiTier" type="button" aria-pressed="false" title="show every setting">Advanced</button>
+        </div>
+        <input id="controlSearch" type="search" autocomplete="off" spellcheck="false" placeholder="Find a setting…" aria-label="Find a setting" aria-describedby="searchHelp" />
+        <p id="searchHelp" role="status"></p>
+      </div>
+
+      <!-- 0. performance macros, in both tiers: each knob moves many controls around the look's own
+           values (0.5 = the look as authored); right-click one to MIDI-learn it -->
+      <details class="sec" id="sec-macros" open>
+        <summary>Macros <span class="hint">0.5 = the look · double-click resets</span></summary>
+        <div class="body"><div id="macros" class="macros" role="group" aria-label="Macros"></div></div>
+      </details>
+
+      <!-- the quick way in (Simple shows this, the macros, Input and the top bar): every widget here
+           is a view of the same controls as the Advanced panel -->
+      <details class="sec" id="sec-make" open>
+        <summary>Make something <span class="hint" id="lookName"></span></summary>
+        <div class="body">
+          <div class="looks" id="looks" role="group" aria-label="Look"></div>
+          <div class="row">
+            <button id="surprise" type="button" class="primary" title="another look, lightly varied — what has grown stays (unless fresh canvas)">✨ Surprise me</button>
+            <label class="note" style="margin: 0" title="a look or Surprise clears the growth first"><input id="freshCanvas" type="checkbox" /> fresh canvas</label>
+          </div>
+          <div id="audioSensRow" class="ctl-list" hidden></div>
+          <div class="row">
+            <label for="camStyle">Camera</label>
+            <select id="camStyle" style="flex: 1; min-width: 0">
+              <option value="framed">Framed — keeps all of it in view</option>
+              <option value="gentle">Gentle orbit — framed, circling</option>
+              <option value="director">Director — cuts on the music</option>
+              <option value="flight">Flight — on through the growth</option>
+              <option value="still">Still — hold this view</option>
+              <option value="manual">Manual — drag and wheel</option>
+              <option value="other" hidden disabled></option>
+            </select>
+          </div>
+          <div class="sub">Draw a source</div>
+          <div class="intents" role="group" aria-label="Draw a source">
+            <button id="srcTrace" type="button" aria-pressed="false" title="music draws along a picture's lines (asks for a picture when none is open)">Trace details</button>
+            <button id="srcRelief" type="button" aria-pressed="false" title="music grows across a picture's relief (asks for a picture when none is open)">Grow over relief</button>
+            <button id="srcModel" type="button" aria-pressed="false" title="music builds the surface of a 3D model (asks for one when none is loaded)">Skin 3D model</button>
+            <button id="srcOff" type="button" aria-pressed="false" title="no picture, video, camera or model: the music grows freely">Music only</button>
+          </div>
+          <div class="row">
+            <button id="modelPick" type="button" title="glb, gltf, obj or stl — or drop one on the page">Load 3D model…</button>
+            <input id="modelFile" type="file" accept=".glb,.gltf,.obj,.stl" hidden />
+            <span class="note" style="margin: 0">video · camera · picture: in Input</span>
+          </div>
+        </div>
+      </details>
+
+      <!-- 1. where the music comes from -->
+      <details class="sec" id="sec-input" open>
+        <summary>Input <span class="hint" id="inputHint"></span></summary>
+        <div class="body">
+          <div class="row">
+            <button id="modeMidi" class="active">MIDI</button>
+            <button id="modeFile">Audio file</button>
+            <button id="modeMic">Mic / line in</button>
+            <button id="modeTab" title="capture a Chrome tab (Spotify web player, YouTube…) or, on Windows, system audio">Tab / system audio</button>
+          </div>
+          <div class="row" id="midiRow">
+            <select id="midiDevice" style="flex:1" aria-label="MIDI input"><option value="all">all MIDI inputs</option></select>
+          </div>
+          <div class="row" id="micRow" hidden>
+            <select id="micDevice" style="flex:1" aria-label="Microphone input"><option value="">default input</option></select>
+          </div>
+          <div class="row" id="fileRow" hidden>
+            <input id="file" type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a" multiple aria-label="Audio files" />
+          </div>
+          <div class="row" id="transport" hidden>
+            <button id="prevBtn" title="previous track" aria-label="Previous track">⏮</button>
+            <button id="playBtn" title="Space" aria-label="Play or pause">▶</button>
+            <button id="nextBtn" title="next track" aria-label="Next track">⏭</button>
+            <input id="seek" type="range" min="0" max="1000" value="0" style="flex:1; margin:0" aria-label="Track position" />
+            <span id="timeLbl" style="font: 11px ui-monospace, monospace; color:#9ad">0:00 / 0:00</span>
+          </div>
+          <div class="playlist" id="playlist" hidden></div>
+          <div class="row">
+            <button id="videoFile">🎞 video file</button>
+            <button id="videoCam">📷 camera</button>
+            <button id="videoImage" title="growth draws the picture in 3D over time">🖼 picture</button>
+            <button id="videoStop" hidden>stop video</button>
+          </div>
+          <div class="row" id="videoDeviceRow" hidden>
+            <select id="videoDevice" style="flex:1" aria-label="Camera input"></select>
+          </div>
+          <div id="videoStatus" class="note">a picture, video or camera becomes a 3D shape the music grows over</div>
+          <!-- quick controls: the same values as the Organism's Video section (presets, MIDI learn, saved settings) -->
+          <div id="referenceTools" hidden>
+            <div class="row">
+              <strong>3D reference</strong>
+              <button id="refEnable" type="button" title="guidance on, music-led: notes grow along the picture's lines and relief">Use as 3D shape</button>
+              <button id="refFit" type="button" title="frame the whole picture, face-on (also re-aims a locked view)">Fit view</button>
+            </div>
+            <div class="row">
+              <button id="refBuild" type="button" data-tier="advanced" aria-pressed="false" title="a quiet background fill grows over the picture without music">Build shape</button>
+              <button id="refFollow" type="button" aria-pressed="true" title="growth moves with a playing video or camera">Follow live</button>
+              <button id="refVisible" type="button" aria-pressed="true" title="the picture behind the growth">Show</button>
+              <button id="refInvert" type="button" data-tier="advanced" aria-pressed="false" title="invert depth: dark parts come forward instead of bright ones">Invert</button>
+            </div>
+            <label class="slider" for="refSize"><span class="l">Size</span><span class="v" id="refSizeValue">22</span><input id="refSize" type="range" min="4" max="60" step="1" value="22" /></label>
+            <label class="slider" for="refDepth"><span class="l">Depth</span><span class="v" id="refDepthValue">8</span><input id="refDepth" type="range" min="0" max="25" step="0.5" value="8" /></label>
+            <label class="slider" for="refScatter" data-tier="advanced"><span class="l">Spread: details … anywhere</span><span class="v" id="refScatterValue">0.7</span><input id="refScatter" type="range" min="0" max="1" step="0.05" value="0.7" /></label>
+            <div id="refHint" class="note"></div>
+          </div>
+          <div class="row" id="stemsRow" data-tier="advanced" hidden>
+            <button id="stems">🥁 stems (drums / bass / voice / other)</button>
+          </div>
+          <div class="note">drop audio files here for a playlist · shift-drop to add · letters play the keyboard piano</div>
+          <div id="status" role="status">…</div>
+        </div>
+      </details>
+
+      <!-- 2. what it draws -->
+      <details class="sec" id="sec-pattern" data-tier="advanced" open>
+        <summary>Pattern</summary>
+        <div class="body">
+          <div class="engines" id="engines"></div>
+          <p id="blurb"></p>
+          <!-- quick: the same value as Look → growth shader (presets, MIDI learn, saved settings) -->
+          <div class="row" id="materialQuick" data-search="growth shader surface" hidden>
+            <label for="materialPick">Material</label>
+            <select id="materialPick" style="flex: 1; min-width: 0"></select>
+            <button id="materialNext" type="button" title="the next of the ten animated surfaces">Next new ▸</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- 3. the selected pattern's own settings, grouped by the engine -->
+      <div id="engineControls" data-tier="advanced"></div>
+
+      <!-- 4. settings shared by every pattern -->
+      <details class="sec" id="sec-global" data-tier="advanced">
+        <summary>Shared <span class="hint">zoom · palette · decay</span></summary>
+        <div class="body">
+          <div class="row"><label>palette <select id="palette"></select></label></div>
+          <div id="globalControls"></div>
+        </div>
+      </details>
+
+      <!-- 5. presets -->
+      <details class="sec" id="sec-presets" data-tier="advanced">
+        <summary>Presets <span class="hint">click load · shift+click save</span></summary>
+        <div class="body">
+          <div class="presets" id="presets"></div>
+          <div class="row">
+            <button id="randomMix" title="one of the six looks, lightly varied — shift+click a slot to keep it">✨ Surprise me</button>
+            <button id="wildMix" title="randomise the look and behaviour, anything goes — shift+click a slot to keep one">🎲 wild mix</button>
+          </div>
+          <div id="presetStatus" class="note">shift+1…8 or a MIDI program change also switch slots; sliders morph over 2 s</div>
+        </div>
+      </details>
+
+      <!-- 6. playing it -->
+      <details class="sec" id="sec-play" data-tier="advanced">
+        <summary>Play <span class="hint">instrument · gestures · MIDI map</span></summary>
+        <div class="body">
+          <div class="row">
+            <label>instrument <select id="instrument"></select></label>
+            <label>vol <input id="instVol" type="range" min="0" max="1" step="0.02" value="0.5" style="width:70px" /></label>
+          </div>
+          <div class="row">
+            <button id="soundBack">🔈 sound-back</button>
+            <button id="gestures">🖐 gestures (webcam)</button>
+          </div>
+          <div class="row">
+            <input id="textIn" type="text" style="flex:1" placeholder="words to grow (set typography = typed text)" maxlength="32" aria-label="Words to grow" />
+            <button id="textGo">grow</button>
+          </div>
+          <div class="row">
+            <button id="ccClear" title="forget all MIDI CC mappings">clear MIDI map</button>
+            <span class="note" style="margin:0">right-click a slider, then move a knob</span>
+          </div>
+          <div id="interactStatus" style="color:#7fb;font:11px ui-monospace,monospace;white-space:pre-wrap"></div>
+        </div>
+      </details>
+
+      <!-- 7. getting it out -->
+      <details class="sec" id="sec-output" data-tier="advanced">
+        <summary>Output <span class="hint">record · still · cast</span></summary>
+        <div class="body">
+          <div class="row">
+            <label style="flex:1">file <select id="recFormat" style="flex:1"></select></label>
+          </div>
+          <div class="row">
+            <label>size <select id="recSize"></select></label>
+            <label>fps <select id="recFps"><option value="30">30</option><option value="60">60</option></select></label>
+          </div>
+          <div class="row">
+            <label>quality <select id="recQuality"></select></label>
+          </div>
+          <div class="row">
+            <label style="flex:1">sound
+              <select id="recAudio" style="flex:1">
+                <option value="mix" title="input + instrument + sound-back">Full mix · everything heard</option>
+                <option value="input" title="the audio file, microphone or tab, without the instrument or sound-back">Input only · file / mic / tab</option>
+              </select>
+            </label>
+          </div>
+          <div class="row" id="recStreamRow" hidden>
+            <label title="streams the take into a file you choose at the start — for long takes; the index goes at the end of the file"><input id="recStream" type="checkbox" /> save while recording (pick the file first)</label>
+          </div>
+          <div id="recFormatNote" class="note"></div>
+          <div id="recStatus" class="note" style="color:#7fb; font-family: ui-monospace, monospace"></div>
+          <div class="row">
+            <input id="castUrl" type="text" style="flex:1" placeholder="http://mediamtx:8889/growth/whip" aria-label="WHIP stream address" />
+            <button id="cast">cast</button>
+          </div>
+          <div id="castStatus" class="note">WHIP to mediamtx; the compositor pulls it as a <b>whep</b> clip at …/growth/whep</div>
+          <div class="row">
+            <button id="copyCaptureUrl">copy capture URL</button>
+            <span id="captureStatus" style="color:#7fb"></span>
+          </div>
+          <div class="note">
+            For Syphon / Spout: open that URL as an OBS <b>Browser Source</b>, then send it on — Windows <b>obs-spout2</b> → Spout;
+            macOS an OBS Syphon plugin, or <b>DistroAV</b> (NDI) → NDI Syphon. Resolume / TouchDesigner / MadMapper take NDI directly.
+          </div>
+        </div>
+      </details>
+
+      <!-- 8. reference -->
+      <details class="sec" id="sec-keys" data-tier="advanced">
+        <summary>Keys</summary>
+        <div class="body keys">
+          <kbd>1</kbd>–<kbd>5</kbd> pattern · <kbd>Enter</kbd> performance · <kbd>F2</kbd> or <kbd>`</kbd> hide UI (<kbd>`</kbd>: the key left of <kbd>1</kbd>, no Fn needed on a Mac) · <kbd>Esc</kbd> show UI ·
+          <kbd>Tab</kbd> next control · <kbd>Backspace</kbd> reset · <kbd>[</kbd> <kbd>]</kbd> palette · <kbd>Space</kbd> play/pause ·
+          <kbd>↑</kbd><kbd>↓</kbd> zoom · <kbd>←</kbd><kbd>→</kbd> mirror folds ·
+          <kbd>R</kbd> record · <kbd>Q</kbd> still · <kbd>C</kbd> camera · <kbd>V</kbd> lock the view · <kbd>Shift</kbd>+<kbd>1</kbd>…<kbd>8</kbd> preset<br />
+          shortcuts work unless you are typing in a text field; a focused slider keeps its arrow keys<br />
+          mouse: middle-drag (or <kbd>Alt</kbd>+drag) orbit · <kbd>Shift</kbd>+middle-drag or right-drag pan · wheel zoom · double-click resets them<br />
+          piano: <kbd>A</kbd>…<kbd>K</kbd> white keys, <kbd>W</kbd>…<kbd>U</kbd> black, <kbd>Z</kbd>/<kbd>X</kbd> octave, <kbd>Shift</kbd> for full velocity
+        </div>
+      </details>
+    </div>
+
+    <div id="hud"><b id="hudEngine"></b> · <span id="hudInput"></span> · notes <b id="hudNotes">–</b> · <span id="meter"><i></i></span> · <b id="hudBpm">–</b> bpm · zoom <b id="hudZoom">1.00</b> · <b id="hudFps">–</b> fps<span id="hudRec"></span> · <span id="hudVer"></span></div>
+
+    <script type="module" src="/src/midi/main.ts"></script>
+  </body>
+</html>

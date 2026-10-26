@@ -1,0 +1,38 @@
+/* Growth 0.15.1: readable controls while retaining the original black stage. */
+[hidden] { display: none !important; }
+html, body { font-size: 14px; }
+#panel { width: min(370px, calc(100vw - 24px)); max-height: calc(100dvh - 70px); scrollbar-width: thin; scrollbar-color: #46525c transparent; }
+#panel h1 { font-size: 16px; }
+#panelTop { padding-top: 12px; padding-bottom: 12px; }
+button, select { min-height: 34px; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible {
+  outline: 2px solid #99ffcc; outline-offset: 3px;
+}
+details.sec > summary { font-size: 14px; padding: 12px 2px 9px; color: #bac3d1; }
+details.sec > summary .hint { font-size: 12px; color: #919aaa; }
+.note, #blurb, .keys { font-size: 13px; color: #aab4c3; }
+.slider { margin: 8px 0; }
+.slider span.v, #status, #hud, kbd { font-size: 12px; }
+.slider input { min-height: 26px; accent-color: #8fe6b6; }
+.icons { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.icons button.icon { padding: 7px 2px; opacity: .7; }
+.icons button.icon small { font-size: 12px; }
+.engines button small, .presets button, .playlist button { font-size: 12px; }
+.playlist button { min-height: 32px; }
+.row > input[type=text], .row > input[type=file] { min-width: 0; max-width: 100%; }
+#controlSearch { width: 100%; min-height: 36px; margin-top: 10px; }
+#searchHelp { margin: 5px 0 0; font-size: 12px; color: #aab4c3; }
+#hud { max-width: calc(100vw - 24px); bottom: 10px; }
+#returnUi { display: none; position: fixed; top: 12px; right: 12px; z-index: 5; }
+body.hide-ui #returnUi { display: block; }
+body.hide-cursor #returnUi { opacity: 0; }
+body.hide-ui #returnUi:focus-visible, body.hide-ui #returnUi:hover { opacity: 1; }
+body.capture-output #returnUi { display: none; }
+@media (max-width: 600px) {
+  #panel { top: 8px; left: 8px; width: min(370px, calc(100vw - 16px)); max-height: 60dvh; }
+  #hud { left: 8px; font-size: 12px; }
+  details.sec > summary .hint { max-width: 55%; text-align: right; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #panel, #hud, details.sec > summary::before { transition: none; }
+}
