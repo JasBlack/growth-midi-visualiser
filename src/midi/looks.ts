@@ -48,7 +48,7 @@ export const LOOK_BASE: Readonly<Record<string, number>> = {
   // the Organism's "Obvious" music response (step 4 defaults)
   speed: 1, musicAmount: 1, sustain: 1.5, fillRate: 1500, musicFocus: 0.5, musicTrail: 2.5,
   thickness: 1, nodes: 1, length: 1, branch: 1, wiggle: 1, lignify: 1.6, join: 1, retract: 1, maxLive: 24, cohesion: 0.35,
-  react: 1, pulse: 0.6, flash: 0.6, kick: 0.5, shake: 0.15, speedReact: 0.6, lightReact: 1, glow: 1,
+  react: 1, pulse: 0.6, flash: 0.6, kick: 0, shake: 0.15, speedReact: 0.6, lightReact: 1, glow: 1,
   // bloom on (only bright things glow) and the rim that lets thin growth read on black
   bloom: 0.8, rim: 0.8, env: 0, envShader: 0,
   materialSpeed: 0.8, materialScale: 1, materialReact: 1,
@@ -184,7 +184,7 @@ function webs(id: string, label: string, tone: HazeTone, over: Record<string, nu
       conduct: 0.3,
       flash: 0.25,
       pulse: 0.35,
-      kick: 0.2,
+      kick: 0,
       shake: 0.05,
       musicFocus: 0.3,
       ...over,

@@ -414,7 +414,7 @@ export class OrganismEngine implements Engine, OrganismHost {
     { key: 'react', label: 'music reaction: master intensity', min: 0, max: 2, step: 0.05, value: 1 },
     { key: 'pulse', label: 'swell — every growth thickens on the bass and on hits', min: 0, max: 1, step: 0.05, value: 0.6 },
     { key: 'flash', label: 'flash — everything lights up on hits', min: 0, max: 1, step: 0.05, value: 0.6 },
-    { key: 'kick', label: 'kick — the camera punches in on hits', min: 0, max: 1, step: 0.05, value: 0.5 },
+    { key: 'kick', label: 'kick — the camera punches in on hits (off by default)', min: 0, max: 1, step: 0.05, value: 0 },
     { key: 'shake', label: 'shake — the camera trembles with the bass', min: 0, max: 1, step: 0.05, value: 0.15 },
     { key: 'speedReact', label: 'growth speed follows the energy', min: 0, max: 1, step: 0.05, value: 0.6 },
     { key: 'bloom', label: 'bloom strength (0 = off; follows the sustained energy)', min: 0, max: 2, step: 0.05, value: 0.8 },
