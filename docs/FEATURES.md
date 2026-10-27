@@ -7,6 +7,12 @@ growths bind into one structure. Feed it MIDI, an audio file or a microphone.
 
 Vite + TypeScript + three (WebGPU, WebGL2 fallback). No backend.
 
+## v0.23.1 — no camera punch by default
+
+The camera no longer punches in on every hit. **kick** (React group in the
+console) now starts at 0 in every look; dial it back up for that effect.
+Browsers that saved the old setting are switched off once.
+
 ## New in v0.23.0 — a new look for the controls
 
 The interface now belongs to the same family as Code Painter (paint.jas.black)

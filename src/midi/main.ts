@@ -84,6 +84,8 @@ interface Settings extends SimpleSettings {
   audioSens: number
   /** the console's colours (the stage is dark either way) */
   theme: Theme
+  /** the v0.23.1 camera-kick reset has run in this browser */
+  kickOff: boolean
 }
 const LS = 'midiviz_settings_v3'
 const settings: Settings = {
@@ -114,6 +116,7 @@ const settings: Settings = {
   macroBase: {},
   lookStarted: false,
   freshCanvas: false,
+  kickOff: false,
 }
 /** Nobody has tuned the Organism in this browser yet: the first-run look may set it up. */
 let organismUntouched = true
@@ -137,6 +140,14 @@ let organismUntouched = true
   settings.lookStarted = settings.lookStarted === true
   settings.freshCanvas = settings.freshCanvas === true
   organismUntouched = !(s.engineCtl && typeof s.engineCtl === 'object' && 'organism' in s.engineCtl)
+  // v0.23.1: the camera kick (punch in on hits) is off by default; switch it off once in browsers
+  // that saved the old default, after which a kick the user dials back in is kept
+  if (settings.kickOff !== true) {
+    const org = settings.engineCtl?.organism
+    if (org && 'kick' in org) org.kick = 0
+    if ('e:organism:kick' in settings.macroBase) settings.macroBase['e:organism:kick'] = 0
+    settings.kickOff = true
+  }
 }
 audio.sensitivity = settings.audioSens
 let saveT = 0
