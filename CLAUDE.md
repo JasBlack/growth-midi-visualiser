@@ -57,6 +57,8 @@ src/midi/
                               theme.ts (light/dark + baked dot grid) lookTiles.ts (look thumbnails) toast.ts
   keys.ts panelSearch.ts storage.ts presets.ts synth.ts cast.ts vision.ts videoField.ts color.ts version.ts
 src/vision/                   MediaPipe face/hand landmarker wrapper
+public/                       copied to dist/ as is: og.jpg (1200×630 link-preview card), favicon-32.png,
+                              apple-touch-icon.png; the SVG icon is inline in index.html (works offline)
 scripts/
   release.mjs                 builds single-file HTML + README.txt + launchers + zip (Node zlib)
   vendor.mjs                  copies MediaPipe runtime/models into public/mediapipe (gitignored)
