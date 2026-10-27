@@ -7,6 +7,8 @@ breathes with the music. Feed it MIDI, the computer keyboard, an audio file, a
 microphone or another browser tab; record 1080p/1440p MP4 straight from the
 page. Runs fully offline, no backend.
 
+**Try it live:** https://growth.jas.black (Chrome, Edge or Brave recommended).
+
 ## Run
 
 Requires Node 18+ and Yarn 1.
@@ -29,3 +31,9 @@ the controls.
 
 Full feature guide: [`docs/FEATURES.md`](docs/FEATURES.md). Developer notes:
 [`CLAUDE.md`](CLAUDE.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Jas Black. Bundled libraries keep their own licenses:
+three.js, three-mesh-bvh, mp4-muxer and webm-muxer (MIT), MediaPipe Tasks Vision
+(Apache-2.0).
