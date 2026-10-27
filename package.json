@@ -1,7 +1,7 @@
 {
   "name": "growth-midi-visualiser",
   "private": true,
-  "version": "0.23.2",
+  "version": "0.24.0",
   "license": "MIT",
   "description": "Growth — MIDI / music visualiser: a black 3D space where notes grow organisms",
   "type": "module",

@@ -7,6 +7,19 @@ growths bind into one structure. Feed it MIDI, an audio file or a microphone.
 
 Vite + TypeScript + three (WebGPU, WebGL2 fallback). No backend.
 
+## v0.24.0 — an on-screen keyboard, and phones
+
+- **A keyboard under the stage**, playable with a mouse or fingers: several
+  notes at once, slide across the keys for a glissando, and the lower on a key
+  you touch, the louder the note. It fits as many keys as the width allows (about
+  1½ octaves on a phone, 3 on a desktop), starts at the computer keyboard's octave
+  (‹ › or Z / X move both) and lights every note held from any source. Switch it
+  off with **keys** in Source.
+- **Phones and tablets:** the stage and the keyboard stay pinned at the top while
+  the panels scroll under them, also with the phone on its side. In **perform** on
+  a touch screen the keyboard stays at the bottom, so you can keep playing (it is
+  never in a `?ui=0` capture).
+
 ## v0.23.2 — an icon and a link preview
 
 Growth now has its own icon in browser tabs, bookmarks and on phone home

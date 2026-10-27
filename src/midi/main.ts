@@ -31,6 +31,7 @@ import { readStored, writeStored } from './storage'
 import { setupSimple, type SimpleSettings, type WidgetOpts } from './simpleUi'
 import { RENAMED_MACROS, loadMacroBases, loadMacroPositions, neutralMacros } from './macros'
 import { paintRange, paintRangesOnInput, setPressed } from './ui/dom'
+import { PianoKeys } from './ui/pianoKeys'
 import { makeKnob } from './ui/knob'
 import { asTheme, setupTheme, applyTheme, type Theme } from './ui/theme'
 import { toast } from './ui/toast'
@@ -86,6 +87,8 @@ interface Settings extends SimpleSettings {
   theme: Theme
   /** the v0.23.1 camera-kick reset has run in this browser */
   kickOff: boolean
+  /** the on-screen keyboard under the stage */
+  pianoKeys: boolean
 }
 const LS = 'midiviz_settings_v3'
 const settings: Settings = {
@@ -117,6 +120,7 @@ const settings: Settings = {
   lookStarted: false,
   freshCanvas: false,
   kickOff: false,
+  pianoKeys: true,
 }
 /** Nobody has tuned the Organism in this browser yet: the first-run look may set it up. */
 let organismUntouched = true
@@ -139,6 +143,7 @@ let organismUntouched = true
   for (const [cc, id] of Object.entries(settings.ccMap)) if (RENAMED_MACROS[id]) settings.ccMap[cc] = RENAMED_MACROS[id]
   settings.lookStarted = settings.lookStarted === true
   settings.freshCanvas = settings.freshCanvas === true
+  settings.pianoKeys = settings.pianoKeys !== false
   organismUntouched = !(s.engineCtl && typeof s.engineCtl === 'object' && 'organism' in s.engineCtl)
   // v0.23.1: the camera kick (punch in on hits) is off by default; switch it off once in browsers
   // that saved the old default, after which a kick the user dials back in is kept
@@ -1336,6 +1341,25 @@ $('cast').onclick = () => {
   void caster.start(canvas, url)
 }
 
+// ---------------------------------------------------------------- on-screen keyboard
+const screenKeys = new PianoKeys($('pianoKeys'), clock, piano)
+$('pianoDown').onclick = () => screenKeys.shift(-1)
+$('pianoUp').onclick = () => screenKeys.shift(1)
+{
+  const toggle = $('pianoToggle')
+  const apply = () => {
+    document.body.classList.toggle('no-piano', !settings.pianoKeys)
+    setPressed(toggle, settings.pianoKeys)
+    if (!settings.pianoKeys) screenKeys.releaseAll()
+  }
+  toggle.onclick = () => {
+    settings.pianoKeys = !settings.pianoKeys
+    apply()
+    save()
+  }
+  apply()
+}
+
 // ---------------------------------------------------------------- interact: instrument, sound-back, gestures
 {
   const sel = $<HTMLSelectElement>('instrument')
@@ -1550,6 +1574,7 @@ function loop() {
   const onset = audio.analyze()
   clock.tick(mode !== 'midi' && audio.active ? audio.features : null, mode !== 'midi' ? onset : 0)
   const m = clock.state
+  screenKeys.update(m.active.keys())
   morph.tick()
   simple.tick()
   // the instrument plays what you play (every MIDI channel, the keyboard), never audio pseudo-notes;

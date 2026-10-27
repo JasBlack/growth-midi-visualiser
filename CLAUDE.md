@@ -55,6 +55,7 @@ src/midi/
   looks.ts simpleUi.ts macros.ts   authored looks, Simple-mode card, macro knobs
   ui/                         dom.ts (LED-key state, fader fill) knob.ts (LED-ring knob over a range input)
                               theme.ts (light/dark + baked dot grid) lookTiles.ts (look thumbnails) toast.ts
+                              pianoKeys.ts (on-screen keyboard under the stage: touch/mouse, multi-finger, glissando)
   keys.ts panelSearch.ts storage.ts presets.ts synth.ts cast.ts vision.ts videoField.ts color.ts version.ts
 src/vision/                   MediaPipe face/hand landmarker wrapper
 public/                       copied to dist/ as is: og.jpg (1200×630 link-preview card), favicon-32.png,

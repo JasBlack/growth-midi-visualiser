@@ -26,8 +26,8 @@ yarn vendor     # optional: copy MediaPipe runtime/models into public/ (webcam g
 (both, plus start scripts for macOS/Windows).
 
 Use Chrome, Edge or Brave for the WebGPU path; Safari and Firefox run the WebGL2
-fallback. Hold `A`…`K` to play notes from the keyboard; `F2` or `` ` `` hides
-the controls.
+fallback. Hold `A`…`K` to play notes from the keyboard, or play the on-screen
+keys under the visual (works on phones); `F2` or `` ` `` hides the controls.
 
 Full feature guide: [`docs/FEATURES.md`](docs/FEATURES.md). Developer notes:
 [`CLAUDE.md`](CLAUDE.md).

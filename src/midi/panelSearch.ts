@@ -7,7 +7,11 @@
 // state. Option text inside selects is not searched: "orbit" should find the
 // camera control by its label, not every section that lists orbit as a choice.
 
-const IDLE_HELP = 'Hold A–K to grow · F2 or ` hides controls · Esc brings them back'
+// a phone or tablet plays the on-screen keys; a desktop the computer keyboard
+const TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(hover: none) and (pointer: coarse)').matches
+const IDLE_HELP = TOUCH
+  ? 'Tap or slide on the keys under the stage to grow · perform for full screen'
+  : 'Hold A–K to grow · F2 or ` hides controls · Esc brings them back'
 const NO_MATCH = 'No matching settings. Try “species”, “camera” or “decay”.'
 const HIDE = 'data-search-hidden'
 
