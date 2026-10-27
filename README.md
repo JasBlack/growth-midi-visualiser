@@ -31,3 +31,9 @@ the controls.
 
 Full feature guide: [`docs/FEATURES.md`](docs/FEATURES.md). Developer notes:
 [`CLAUDE.md`](CLAUDE.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Jas Black. Bundled libraries keep their own licenses:
+three.js, three-mesh-bvh, mp4-muxer and webm-muxer (MIT), MediaPipe Tasks Vision
+(Apache-2.0).
