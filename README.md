@@ -7,6 +7,8 @@ breathes with the music. Feed it MIDI, the computer keyboard, an audio file, a
 microphone or another browser tab; record 1080p/1440p MP4 straight from the
 page. Runs fully offline, no backend.
 
+**Try it live:** https://growth.jas.black (Chrome, Edge or Brave recommended).
+
 ## Run
 
 Requires Node 18+ and Yarn 1.

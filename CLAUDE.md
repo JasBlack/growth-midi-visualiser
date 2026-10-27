@@ -83,7 +83,10 @@ and `growth-visualiser-v<version>.zip` in the project root (gitignored).
 
 ## Deployment
 
-No server-side component. Distributed as the release zip / single HTML file that users open locally
+No server-side component. Hosted at https://growth.jas.black via GitHub Pages:
+`.github/workflows/pages.yml` builds `dist/` on every push to `main` (Pages source = GitHub Actions,
+custom domain set in repo Settings → Pages; DNS is a `growth` CNAME → `jasblack.github.io`).
+Also distributed as the release zip / single HTML file that users open locally
 (double-click, or the bundled `start-mac.command` / `start-windows.cmd`, which run `launch.py` on
 `http://localhost:8765/`). Any static host works (built with relative `base: './'`); it must be HTTPS
 or localhost because MIDI, microphone, camera and screen capture need a secure context. For live
