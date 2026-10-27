@@ -1,398 +1,741 @@
 <!doctype html>
-<html lang="en" data-ui="simple">
+<html lang="en" data-ui="simple" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <script>
-      // the panel tier before the first paint (the module runs later): no flash of the Advanced panel
-      try { if (JSON.parse(localStorage.getItem('midiviz_settings_v3') || '{}').uiMode === 'advanced') document.documentElement.dataset.ui = 'advanced' } catch (e) {}
+      // the panel tier and console theme before the first paint (the module runs later): no flash
+      try {
+        var s = JSON.parse(localStorage.getItem('midiviz_settings_v3') || '{}')
+        if (s.uiMode === 'advanced') document.documentElement.dataset.ui = 'advanced'
+        if (s.theme === 'light') document.documentElement.dataset.theme = 'light'
+      } catch (e) {}
+      // ?ui=0 (a capture output): the stage alone from the first paint; main.ts takes over with body.hide-ui
+      if (/[?&]ui=0(&|$)/.test(location.search)) document.documentElement.dataset.capture = ''
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Growth — MIDI / music visualiser</title>
+    <!-- the family's type; offline (the single file) falls back to the system monospace without waiting -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'" />
     <style>
-      :root { color-scheme: dark; }
+      /* ───────────── tokens: Code Painter's console (light / dark); the stage stays dark either way ───────────── */
+      :root {
+        --accent: #39ff88; --accent2: #b36bff; --recred: #ff3b30; --stage: #0b0b0c; --lcd: #0b0b0c;
+        --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        --wide: 'Archivo', 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+        --glow-g: 0 0 4px color-mix(in srgb, var(--accent) 90%, transparent);
+        --glow-p: 0 0 4px color-mix(in srgb, var(--accent2) 90%, transparent);
+      }
+      :root, html[data-theme='dark'] {
+        color-scheme: dark;
+        --case: #121314; --panel: #18191b; --line: #26272a; --key: #222326; --keyon: #1b1c1e; --keyline: #303135; --keyshadow: #070708;
+        --press: rgba(0,0,0,.5); --text: #e4e4e1; --muted: #7a7b80; --ledoff: #34353a; --knobtop: #2c2d31; --track: #2e2f33;
+        --well: #141517; --ink: #e4e4e1; --inktext: #121314; --thumb: #dcddd9; --dots: rgba(255,255,255,0.065);
+        --focus: var(--accent); --oktext: var(--accent);
+      }
+      html[data-theme='light'] {
+        color-scheme: light;
+        --case: #e7e7e4; --panel: #efefec; --line: #d6d6d2; --key: #fafaf8; --keyon: #ececea; --keyline: #cfcfcb; --keyshadow: #bdbdb8;
+        --press: rgba(0,0,0,.12); --text: #1b1b1d; --muted: #77776f; --ledoff: #cdcdc9; --knobtop: #fafaf8; --track: #d0d0cc;
+        --well: #e4e4e1; --ink: #1b1b1d; --inktext: #f2f2ef; --thumb: #ffffff; --dots: rgba(0,0,0,0.11);
+        /* green text and rings need more weight on a light case */
+        --focus: #0b9a4c; --oktext: #0b8a45;
+      }
       * { box-sizing: border-box; }
-      html, body { margin: 0; height: 100%; background: #000; color: #cfd3da; font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      /* the case: flat colour + the baked dot-grid tile (ui/theme.ts) */
+      body {
+        background-color: var(--case); background-image: var(--dotgrid, none); background-size: 24px 24px; background-position: -12px -12px;
+        color: var(--text); font: 400 11px/1.45 var(--mono); -webkit-font-smoothing: antialiased;
+      }
       /* `hidden` must beat display:flex rows (mode rows, playlist, countdown); the search hides its own way */
       [hidden], [data-search-hidden] { display: none !important; }
-      #stage { position: fixed; inset: 0; background: #000; }
-      #stage canvas { display: block; width: 100%; height: 100%; }
-      #panel {
-        position: fixed; top: 12px; left: 12px; width: min(370px, calc(100vw - 24px)); max-height: calc(100dvh - 70px); overflow: auto;
-        background: rgba(12, 13, 16, 0.86); border: 1px solid #2a2d35; border-radius: 10px; padding: 0 12px 10px;
-        backdrop-filter: blur(8px); transition: opacity 0.25s, transform 0.25s; scrollbar-width: thin; scrollbar-color: #46525c transparent;
-      }
-      /* title + reset stay pinned while the sections scroll under them */
-      #panelTop {
-        position: sticky; top: 0; z-index: 3; margin: 0 -12px; padding: 12px;
-        background: rgba(10, 11, 14, 0.97); border-bottom: 1px solid #262a33; border-radius: 9px 9px 0 0;
-      }
-      body.hide-ui #panel, body.hide-ui #hud { opacity: 0; pointer-events: none; transform: translateX(-8px); }
+      button, select, input, textarea { font: inherit; color: inherit; }
+      :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+      .sr { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0 !important; padding: 0 !important; margin: -1px !important; opacity: 0; }
       body.hide-cursor { cursor: none; }
+
+      /* ───────────── layout: top bar, step column, stage well, console column ───────────── */
+      #app {
+        position: fixed; inset: 0; padding: 12px 14px 14px; display: grid; gap: 12px;
+        grid-template-columns: 300px minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr);
+        grid-template-areas: 'top top' 'left stage';
+      }
+      html[data-ui='advanced'] #app, html[data-searching] #app {
+        grid-template-columns: 290px minmax(0, 1fr) 300px; grid-template-areas: 'top top top' 'left stage right';
+      }
+      /* the panel wrapper only groups the chrome (inert while hidden); its children are the grid items */
+      #panel { display: contents; }
+      #topbar { grid-area: top; }
+      #colLeft { grid-area: left; }
+      #colRight { grid-area: right; }
+      #centre { grid-area: stage; }
+      .col {
+        display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain;
+        scrollbar-width: thin; scrollbar-color: var(--keyline) transparent; padding: 0 3px 2px 0; margin-right: -3px;
+      }
+      .col::-webkit-scrollbar { width: 4px; } .col::-webkit-scrollbar-thumb { background: var(--keyline); border-radius: 2px; }
+
+      /* ───────────── top bar ───────────── */
+      #topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 14px; padding: 0 2px; min-width: 0; }
+      #topbar .hl, #topbar .hr { display: flex; align-items: center; gap: 14px; min-width: 0; }
+      #topbar .hr { justify-content: flex-end; gap: 8px; }
+      .brandbox { display: flex; align-items: center; gap: 9px; flex: none; }
+      .brand { font: 800 13px/1 var(--wide); letter-spacing: .32em; white-space: nowrap; color: var(--text); margin-right: -.32em; }
+      .ver { font-size: 8.5px; letter-spacing: .1em; color: var(--muted); }
+      #storageNote { font-size: 8.5px; letter-spacing: .08em; color: var(--accent2); white-space: nowrap; }
+      .transport { display: flex; gap: 8px; align-items: center; }
+      .status { display: flex; gap: 14px; font-size: 9px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
+      .status .st { display: flex; align-items: center; gap: 6px; }
+      .led { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ledoff); flex: none; }
+      .led.g, .st.on .led { background: var(--accent); box-shadow: var(--glow-g); }
+      .st.on { color: var(--text); }
+      #ledRec.on .led { background: var(--recred); box-shadow: 0 0 5px rgba(255,59,48,.8); animation: recpulse 1.2s ease-in-out infinite; }
+      #ledRec.armed .led { background: var(--accent2); box-shadow: var(--glow-p); animation: blink .6s steps(2) infinite; }
+      @keyframes recpulse { 50% { opacity: .45; } }
+      @keyframes blink { 50% { opacity: .15; } }
+
+      /* physical keys: flat face, 1px keyline, a 2px drop; an LED on top when they hold a state */
+      .key {
+        position: relative; height: 40px; min-width: 40px; padding: 0 11px 7px; border-radius: 9px; border: 1px solid var(--keyline);
+        background: var(--key); box-shadow: 0 2px 0 var(--keyshadow); font: 500 9px/1 var(--mono); letter-spacing: .03em; color: var(--text);
+        display: inline-flex; align-items: flex-end; justify-content: center; cursor: pointer; flex: none; user-select: none; white-space: nowrap; text-transform: lowercase;
+      }
+      .key:hover:not(:disabled) { border-color: var(--muted); }
+      .key:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 var(--keyshadow); }
+      .key:disabled { opacity: .4; cursor: default; }
+      .key[aria-pressed]::before { content: ''; position: absolute; left: 50%; top: 6px; margin-left: -2.5px; width: 5px; height: 5px; border-radius: 50%; background: var(--ledoff); }
+      .key[aria-pressed='true'] { transform: translateY(1px); background: var(--keyon); box-shadow: 0 1px 0 var(--keyshadow), inset 0 1px 3px var(--press); }
+      .key[aria-pressed='true']::before { background: var(--accent); box-shadow: var(--glow-g); }
+      .key.go { background: var(--accent); color: #0b0b0c; border-color: color-mix(in srgb, var(--accent) 80%, #000); box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000); font-weight: 600; }
+      .key.go:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, #000); }
+      .key.ink { background: var(--ink); color: var(--inktext); border-color: var(--ink); }
+      .key.ico { width: 40px; padding: 0; align-items: center; }
+      .key.ico svg { display: block; }
+      /* the camera key cycles and names the mode (long names are cut, the title has them) */
+      .key.cam { display: block; max-width: 150px; padding: 18px 11px 0; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+      /* record: a light key whose dot turns red while a take runs (recordUi toggles .rec) */
+      .recbtn::before { content: ''; width: 8px; height: 8px; margin: 0 6px 0 0; border-radius: 50%; background: currentColor; opacity: .55; flex: none; align-self: flex-end; }
+      .key.recbtn::before { margin-bottom: -.5px; }
+      .col .recbtn::before { align-self: center; margin: 0; }
+      .recbtn.rec::before { background: var(--recred); opacity: 1; box-shadow: 0 0 5px rgba(255,59,48,.8); animation: recpulse 1.2s ease-in-out infinite; }
+      .recbtn[data-state='armed']::before, .recbtn[data-state='counting']::before { background: var(--accent2); opacity: 1; box-shadow: var(--glow-p); animation: blink .6s steps(2) infinite; }
+
+      /* segmented switch (easy | console, the input modes): an LED on the active one */
+      .seg { display: inline-flex; border: 1px solid var(--keyline); border-radius: 10px; padding: 2px; gap: 2px; background: var(--well); flex: none; }
+      .seg button {
+        height: 30px; border: 0; border-radius: 8px; background: transparent; padding: 0 9px; font: 500 9.5px/1 var(--mono); letter-spacing: .04em;
+        color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; white-space: nowrap; box-shadow: none; min-height: 0;
+      }
+      .seg button::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: transparent; flex: none; }
+      .seg button:hover { color: var(--text); }
+      .seg button[aria-pressed='true'] { background: var(--key); color: var(--text); box-shadow: 0 1px 0 var(--keyshadow), 0 0 0 1px var(--keyline); transform: none; }
+      .seg button[aria-pressed='true']::before { background: var(--accent); box-shadow: var(--glow-g); }
+      .seg.wide { display: flex; } .seg.wide button { flex: 1; min-width: 0; padding: 0 4px; }
+
+      /* ───────────── panels ───────────── */
+      .panel { flex: none; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); padding: 12px 14px; min-width: 0; }
+      details.sec > summary {
+        list-style: none; display: flex; align-items: center; gap: 9px; min-height: 20px; cursor: pointer; user-select: none;
+        font: 500 9px/1.2 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--muted); white-space: nowrap;
+      }
+      details.sec > summary::-webkit-details-marker { display: none; }
+      details.sec > summary b { color: var(--text); font-weight: 600; }
+      details.sec > summary .hint { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 8.5px; letter-spacing: .16em; }
+      details.sec > summary::after {
+        content: ''; flex: none; width: 5px; height: 5px; margin: -3px 2px 0 auto; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+        transform: rotate(45deg); opacity: .6; transition: transform .15s;
+      }
+      details.sec > summary:has(.hint)::after { margin-left: 4px; }
+      details.sec:not([open]) > summary::after { transform: rotate(-45deg); margin-top: 0; }
+      details.sec > summary:hover::after { opacity: 1; }
+      details.sec[open] > summary { margin-bottom: 11px; }
+      /* numbered steps (easy): a green badge; the console drops the numbers */
+      .step > summary { font-size: 9px; }
+      .step > summary b { font-size: 10.5px; }
+      .num { font-style: normal; width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--accent); color: #0b0b0c; font: 700 11px/1 var(--mono); letter-spacing: 0; flex: none; }
+      html[data-ui='advanced'] .num { display: none; }
+      html[data-ui='advanced'] .step > summary b { font-size: 9.5px; }
+      .body { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+      #colRight .panel { padding: 11px 12px; }
+      #colRight .body { gap: 8px; }
+      .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; min-width: 0; }
+      .row > .grow, .row > select.grow, .row > input.grow { flex: 1; min-width: 0; }
+      .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+      .trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .lbl { font-size: 9px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
+      #colRight .row > .lbl:first-child { min-width: 58px; } /* console rows: the wells line up */
+      .note { color: var(--muted); font-size: 9.5px; line-height: 1.5; margin: 0; }
+      .note b { color: var(--text); font-weight: 500; }
+      .sub { margin: 4px 0 0; font-size: 8.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+      .mono-ok { color: var(--oktext); font-size: 9.5px; white-space: pre-wrap; min-height: 0; }
+      .mono-ok:empty { display: none; }
+
+      /* panel buttons: keys too, label centred, an LED when they hold a state */
+      .col button {
+        position: relative; min-height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--keyline); background: var(--key);
+        box-shadow: 0 2px 0 var(--keyshadow); font: 500 10px/1.15 var(--mono); letter-spacing: .03em; color: var(--text); cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; text-transform: lowercase; min-width: 0;
+      }
+      .col button:hover:not(:disabled) { border-color: var(--muted); }
+      .col button:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 var(--keyshadow); }
+      .col button:disabled { opacity: .4; cursor: default; }
+      .col button[aria-pressed]::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--ledoff); flex: none; }
+      .col button[aria-pressed='true'], .col button.on, .col button.active {
+        transform: translateY(1px); background: var(--keyon); box-shadow: 0 1px 0 var(--keyshadow), inset 0 1px 3px var(--press);
+      }
+      .col button[aria-pressed='true']::before { background: var(--accent); box-shadow: var(--glow-g); }
+      .col button > span { overflow: hidden; text-overflow: ellipsis; }
+      .col .seg button { box-shadow: none; border: 0; min-height: 0; text-transform: lowercase; }
+      .col .seg button[aria-pressed='true'] { transform: none; box-shadow: 0 1px 0 var(--keyshadow), 0 0 0 1px var(--keyline); background: var(--key); }
+      .col .seg button[aria-pressed]::before { width: 5px; height: 5px; background: transparent; }
+      .col .seg button[aria-pressed='true']::before { background: var(--accent); }
+      .col button.go { background: var(--accent); color: #0b0b0c; border-color: color-mix(in srgb, var(--accent) 80%, #000); box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000); font-weight: 600; }
+      .col button.big { min-height: 40px; font-size: 11px; border-radius: 10px; }
+      .col button.ink { background: var(--ink); color: var(--inktext); border-color: var(--ink); }
+      .elink { align-self: flex-start; border: 0 !important; background: none !important; box-shadow: none !important; padding: 0 !important; min-height: 0 !important; color: var(--muted) !important; font-size: 9.5px !important; text-decoration: underline; text-underline-offset: 3px; text-transform: none !important; }
+      .elink:hover { color: var(--text) !important; }
+      .elink::before { display: none !important; }
+
+      /* dropdowns: dark wells with a small caret */
+      select {
+        appearance: none; -webkit-appearance: none; height: 30px; border-radius: 8px; border: 1px solid var(--keyline); max-width: 100%; min-width: 0;
+        background: var(--well) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%238c8c88'/%3E%3C/svg%3E") no-repeat right 10px center;
+        padding: 0 26px 0 10px; font: 500 10px var(--mono); color: var(--text); cursor: pointer; box-shadow: inset 0 1px 2px var(--press);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      select:disabled { opacity: .4; cursor: default; }
+      select option, select optgroup { background: var(--panel); color: var(--text); }
+      input[type='text'], input[type='search'] {
+        height: 30px; border-radius: 8px; border: 1px solid var(--keyline); background: var(--well); padding: 0 10px; font: 500 10px var(--mono);
+        color: var(--text); outline: none; min-width: 0; box-shadow: inset 0 1px 2px var(--press);
+      }
+      input[type='text']:focus, input[type='search']:focus { border-color: var(--focus); }
+      input::placeholder { color: var(--muted); opacity: .8; }
+      input[type='file'] { font: 500 9.5px var(--mono); color: var(--muted); max-width: 100%; min-width: 0; }
+      input[type='file']::file-selector-button {
+        height: 28px; margin-right: 8px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--keyline); background: var(--key);
+        box-shadow: 0 2px 0 var(--keyshadow); font: 500 10px var(--mono); color: var(--text); cursor: pointer;
+      }
+      input:disabled, button:disabled { cursor: default; }
+
+      /* faders: thin track, green fill to the value, a round light knob */
+      input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; margin: 0; cursor: pointer; min-width: 0; }
+      input[type='range']::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--pct, 0%), var(--track) var(--pct, 0%)); }
+      input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5.5px; border-radius: 50%; background: var(--thumb); box-shadow: 0 1px 3px rgba(0,0,0,.45), inset 0 0 0 1px var(--keyline); }
+      input[type='range']::-moz-range-track { height: 3px; border-radius: 2px; background: var(--track); }
+      input[type='range']::-moz-range-progress { height: 3px; border-radius: 2px; background: var(--accent); }
+      input[type='range']::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--thumb); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+      input[type='range']:disabled { opacity: .4; cursor: default; }
+      input[type='range']:focus-visible { outline-offset: 1px; border-radius: 4px; }
+
+      /* registry widgets (main.ts widget()): label · value, then the fader / select / switch */
+      .slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 8px; border-radius: 6px; }
+      .slider .l { font-size: 9.5px; line-height: 1.3; color: var(--muted); letter-spacing: .02em; min-width: 0; overflow-wrap: anywhere; }
+      .slider .v { font: 600 9.5px/1.3 var(--mono); color: var(--text); text-align: right; }
+      .slider input[type='range'], .slider select { grid-column: 1 / -1; }
+      .slider select { width: 100%; }
+      .slider .cc { color: var(--accent2); font-weight: 600; margin-left: 4px; }
+      .slider.tog { align-items: center; }
+      .col .slider .sw { min-height: 22px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 8.5px; box-shadow: 0 1.5px 0 var(--keyshadow); gap: 5px; }
+      .ctl-list { display: flex; flex-direction: column; gap: 8px; }
+      #globalControls { display: flex; flex-direction: column; gap: 8px; }
+      /* MIDI learn: the control waiting for a knob glows violet */
+      .learn { outline: 1px solid var(--accent2); outline-offset: 3px; background: color-mix(in srgb, var(--accent2) 9%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent2) 35%, transparent); }
+      .learn .l { color: var(--accent2) !important; }
+
+      /* rotary knobs: Code Painter's LED ring over a hidden range input (ui/knob.ts) */
+      .knobs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px 2px; }
+      .slider.kn { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px 0; }
+      .slider.kn .l { font-size: 8.5px; letter-spacing: .02em; text-align: center; white-space: nowrap; overflow: visible; line-height: 1.25; text-transform: lowercase; }
+      .slider.kn .v { text-align: center; font-size: 9px; min-height: 11px; }
+      .slider.kn .cc { display: block; margin: 0; font-size: 8px; }
+      .lk { position: relative; width: 46px; height: 46px; flex: none; touch-action: none; cursor: ns-resize; }
+      .lk .ld { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: var(--ledoff); }
+      .lk .ld.on { background: var(--accent2); box-shadow: var(--glow-p); }
+      .lk .k { position: absolute; inset: 11px; border-radius: 50%; background: var(--knobtop); box-shadow: 0 2px 0 var(--keyshadow), 0 3px 6px rgba(0,0,0,.14), inset 0 0 0 1px var(--keyline); }
+      .lk .k i { position: absolute; inset: 0; border-radius: 50%; }
+      .lk .k i::after { content: ''; position: absolute; left: 50%; top: 3px; width: 2px; height: 7px; margin-left: -1px; border-radius: 1px; background: var(--text); }
+      .lk:hover .k { box-shadow: 0 2px 0 var(--keyshadow), 0 3px 6px rgba(0,0,0,.14), inset 0 0 0 1px var(--muted); }
+      .lk.drag .k { box-shadow: 0 1px 0 var(--keyshadow), inset 0 0 0 1px var(--accent2); }
+      .slider.kn:has(input:focus-visible) .k { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+      /* look tiles: a drawing and a lowercase caption */
+      .looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .col button.tile {
+        display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 4px 4px 5px; min-height: 0; border-radius: 10px;
+        color: var(--muted); font-size: 9.5px; box-shadow: 0 2px 0 var(--keyshadow);
+      }
+      .col button.tile::before { display: none; }
+      .tile canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 7px; background: #060607; }
+      .tile .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+      .col button.tile[aria-pressed='true'] { transform: none; color: var(--text); background: var(--key); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 2px 0 var(--keyshadow); }
+      .fresh { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--keyline); background: var(--key); box-shadow: 0 2px 0 var(--keyshadow); font-size: 10px; cursor: pointer; white-space: nowrap; position: relative; }
+      .fresh input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+      .fresh:has(input:checked) { transform: translateY(1px); background: var(--keyon); box-shadow: 0 1px 0 var(--keyshadow), inset 0 1px 3px var(--press); }
+      .fresh:has(input:checked) .led { background: var(--accent); box-shadow: var(--glow-g); }
+      .fresh:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+      .fresh:has(input:disabled) { opacity: .4; cursor: default; }
+
+      /* camera keys, intents, input video keys, species: small key grids */
+      .camkeys, .intents { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .intents { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .col .camkeys button, .col .intents button { justify-content: flex-start; padding: 0 8px; font-size: 9.5px; }
+      .icons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+      .col .icons button.icon { min-height: 25px; padding: 0 6px; font-size: 8.5px; border-radius: 7px; justify-content: flex-start; gap: 5px; box-shadow: 0 1.5px 0 var(--keyshadow); }
+      .minis { display: flex; gap: 5px; }
+      .col .minis button, .col .acts button { min-height: 22px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 8.5px; box-shadow: 0 1.5px 0 var(--keyshadow); color: var(--muted); }
+      .col .minis button:hover, .col .acts button:hover { color: var(--text); }
+      /* patterns (1–5) */
+      .engines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+      .col .engines button { justify-content: flex-start; padding: 0 8px; }
+      .col .engines button kbd { margin-left: auto; border-color: var(--keyline); }
+      #blurb { margin: 0; }
+      /* presets: eight small keys; violet LED = a saved slot, green = the slot loaded */
+      .presets { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+      .col .presets button { height: 30px; min-height: 30px; padding: 0 0 4px; align-items: flex-end; border-radius: 7px; font-size: 9.5px; font-weight: 600; box-shadow: 0 1.5px 0 var(--keyshadow); }
+      .col .presets button::before { content: ''; position: absolute; left: 50%; top: 4px; margin-left: -2px; width: 4px; height: 4px; border-radius: 50%; background: var(--ledoff); }
+      .col .presets button.full::before { background: var(--accent2); box-shadow: var(--glow-p); }
+      .col .presets button.on::before { background: var(--accent); box-shadow: var(--glow-g); }
+      /* the source: transport and playlist */
+      #transport { flex-wrap: nowrap; }
+      #transport button { min-width: 30px; padding: 0 6px; flex: none; }
+      #timeLbl { font: 500 9.5px var(--mono); color: var(--text); white-space: nowrap; }
+      .playlist { display: flex; flex-direction: column; gap: 3px; max-height: 120px; overflow: auto; }
+      .col .playlist button { justify-content: flex-start; min-height: 24px; font-size: 9.5px; text-transform: none; box-shadow: 0 1px 0 var(--keyshadow); }
+      .col .playlist button.on { color: var(--oktext); }
+      .subpanel { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; display: flex; flex-direction: column; gap: 8px; background: color-mix(in srgb, var(--well) 60%, transparent); }
+      .subpanel strong { font-size: 8.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--text); font-weight: 600; margin-right: auto; }
+      /* search */
+      .find { display: flex; flex-direction: column; gap: 5px; flex: none; }
+      #controlSearch { width: 100%; height: 32px; padding-left: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%238c8c88' stroke-width='1.6'%3E%3Ccircle cx='5' cy='5' r='4'/%3E%3Cpath d='M8 8l3.4 3.4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 10px center; }
+      #searchHelp { margin: 0 2px; font-size: 8.5px; letter-spacing: .06em; color: var(--muted); line-height: 1.4; }
+      kbd { display: inline-block; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font: 500 8.5px/1.6 var(--mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; background: transparent; }
+      .body.keys { display: block; color: var(--muted); font-size: 9.5px; line-height: 2; } /* running text, not a column of items */
+      .keys kbd { color: var(--text); }
+
+      /* ───────────── the stage well and the status line ───────────── */
+      #centre { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+      .well { position: relative; flex: 1; min-height: 0; border-radius: 14px; background: var(--stage); border: 1px solid var(--line); overflow: hidden; }
+      .well::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,.035), inset 0 2px 10px rgba(0,0,0,.55); pointer-events: none; z-index: 2; }
+      #stage { position: absolute; inset: 0; background: #000; }
+      #stage canvas { display: block; width: 100%; height: 100%; }
+      #countdown { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; font: 600 150px/1 var(--mono); color: #e4e4e1; text-shadow: 0 0 40px #000, 0 0 2px #000; pointer-events: none; }
+      body.dragging .well { outline: 2px dashed var(--accent); outline-offset: -6px; }
+      .lcdrow { flex: none; display: flex; gap: 8px; min-width: 0; container-type: inline-size; }
+      .lcd { height: 30px; border-radius: 8px; background: var(--lcd); border: 1px solid #1d1e21; color: var(--accent); font-size: 10px; line-height: 18px; padding: 5px 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      #status { flex: 1 1 0; min-width: 32%; }
+      #hud { flex: 0 1 auto; min-width: 0; color: #7d7e83; font-size: 9.5px; letter-spacing: .03em; }
+      #hud b { color: #e4e4e1; font-weight: 600; }
+      #hud .hz { color: #45464b; padding: 0 2px; }
+      #meter { display: inline-block; width: 48px; height: 4px; border-radius: 2px; background: #26272a; vertical-align: middle; overflow: hidden; margin-top: -2px; }
+      #meter i { display: block; height: 100%; width: 0; background: var(--accent); }
+      #hudRec.live { color: #ff6b62; }
+      .hints { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); padding: 0 6px; }
+      .hints span { white-space: nowrap; }
+      .hints kbd { margin-right: 4px; }
+      /* the readout gives way to the message when the stage is narrow (console mode, small windows) */
+      @container (max-width: 860px) { #hud .wide { display: none; } }
+      @container (max-width: 600px) { #hud { display: none; } }
+      @media (max-width: 1180px) { .status { display: none; } }
+
+      /* ───────────── floating furniture ───────────── */
       /* anything floating over the stage: tag it .ui-overlay and it hides with the UI and in capture output */
       body.hide-ui .ui-overlay, body.capture-output .ui-overlay { display: none !important; }
       /* the way back when the UI is hidden; fades with the cursor, never part of a ?ui=0 capture */
-      #returnUi { display: none; position: fixed; top: 12px; left: 12px; z-index: 5; transition: opacity 0.3s; }
-      body.hide-ui #returnUi { display: block; }
+      #returnUi {
+        display: none; position: fixed; top: 12px; left: 12px; z-index: 5; transition: opacity .3s; height: 32px; padding: 0 12px; align-items: center; opacity: .9;
+        background: rgba(24,25,27,.86); color: #e4e4e1; border-color: #303135; box-shadow: 0 2px 0 #070708; /* dark over the stage in either theme */
+      }
+      body.hide-ui #returnUi { display: inline-flex; }
       body.hide-cursor #returnUi { opacity: 0; }
       body.hide-ui #returnUi:hover, body.hide-ui #returnUi:focus-visible { opacity: 1; }
       body.capture-output #returnUi { display: none; }
-      #panel h1 { font-size: 16px; margin: 0 0 6px; letter-spacing: 0.02em; }
-      #storageNote { color: #fd5; font-weight: 400; font-size: 12px; }
-      /* every section is a collapsible details block */
-      details.sec { border-top: 1px solid #23262e; margin-top: 6px; }
-      #panelTop + details.sec { border-top: 0; margin-top: 2px; }
-      details.sec > summary {
-        cursor: pointer; list-style: none; padding: 12px 2px 9px; font-size: 14px; color: #bac3d1;
-        text-transform: uppercase; letter-spacing: 0.08em; user-select: none; display: flex; align-items: center; gap: 6px;
+      #drop {
+        position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; pointer-events: none;
+        background: rgba(11,11,12,.82); border: 2px dashed var(--accent); border-radius: 16px; margin: 8px;
+        font: 600 12px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: var(--accent);
       }
-      details.sec > summary::-webkit-details-marker { display: none; }
-      details.sec > summary::before { content: '▸'; font-size: 9px; color: #5a6070; transition: transform 0.15s; }
-      details.sec[open] > summary::before { transform: rotate(90deg); }
-      details.sec > summary:hover { color: #cfd3da; }
-      details.sec > summary .hint { text-transform: none; letter-spacing: 0; color: #919aaa; font-size: 12px; margin-left: auto; }
-      details.sec .body { padding: 0 0 8px 2px; }
-      .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
-      .row label { display: flex; gap: 4px; align-items: center; }
-      button, select, input[type='file'] { font: inherit; }
-      button { background: #1b1f27; color: #dfe3ea; border: 1px solid #333846; border-radius: 6px; padding: 4px 9px; cursor: pointer; }
-      button:hover { background: #262b36; }
-      button.primary { background: #2c4a8a; border-color: #3e64b5; }
-      button.active { background: #3a5f2f; border-color: #5a8f47; }
-      select { background: #14171d; color: #dfe3ea; border: 1px solid #333846; border-radius: 6px; padding: 3px 6px; max-width: 100%; }
-      /* comfortable targets for the primary controls only; the icon / preset grids stay compact */
-      .row > button, .row > select, .row > label > select, #returnUi { min-height: 34px; }
-      button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #99ffcc; outline-offset: 3px; }
-      .slider { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 8px 0; }
-      .slider span.l { color: #aab1bd; }
-      .slider span.v { font: 12px ui-monospace, monospace; color: #9ad; text-align: right; }
-      .slider input { grid-column: 1 / span 2; width: 100%; margin: 0; min-height: 26px; accent-color: #8fe6b6; }
-      .engines { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-      .engines button { text-align: left; padding: 5px 8px; }
-      .engines button small { display: block; color: #8a93a3; font-size: 12px; }
-      .icons { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 4px 0; }
-      .icons button.icon { padding: 4px 1px 3px; text-align: center; opacity: 0.4; line-height: 1.1; }
-      .icons button.icon.active { opacity: 1; background: #2b3a2b; border-color: #4d7a45; }
-      .icons button.icon span { font-size: 17px; display: block; }
-      .icons button.icon small { font-size: 10px; color: #aab1bd; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; margin: 4px 0; }
-      .presets button { padding: 4px 0; font: 12px ui-monospace, monospace; }
-      .presets button.filled { border-color: #4d6aa5; color: #cfe; }
-      .presets button.current { background: #2c4a8a; }
-      .playlist { display: flex; flex-direction: column; gap: 2px; max-height: 108px; overflow: auto; margin: 4px 0; }
-      .playlist button { text-align: left; font-size: 12px; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .slider.learn { outline: 1px solid #fd5; border-radius: 4px; }
-      .slider .cc { color: #fd5; font-size: 10px; margin-left: 4px; }
-      button.rec { background: #6a2020; border-color: #a33; }
-      input[type='text'], input[type='search'] { background: #14171d; color: #dfe3ea; border: 1px solid #333846; border-radius: 6px; padding: 3px 6px; font: inherit; }
-      .row > input[type='text'], .row > input[type='file'] { min-width: 0; max-width: 100%; }
-      #controlSearch { width: 100%; min-height: 36px; margin-top: 10px; }
-      #searchHelp { margin: 5px 0 0; font-size: 12px; color: #aab4c3; }
-      .note { color: #aab4c3; font-size: 13px; margin: 3px 0; }
-      button:disabled, input:disabled { opacity: 0.45; cursor: default; }
-      /* Simple / Advanced: one panel, tiers by attribute. A search shows every tier (it filters rows itself). */
-      html[data-ui='simple']:not([data-searching]) [data-tier='advanced'] { display: none !important; }
-      #uiTier { margin-left: auto; }
-      #uiTier[aria-pressed='true'] { background: #2b3a2b; border-color: #4d7a45; }
-      .looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin: 4px 0 6px; }
-      .intents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 4px 0; }
-      .looks button, .intents button { min-height: 34px; padding: 4px 6px; min-width: 0; }
-      /* macros: label, slider and value on one line (five knobs, compact in both tiers) */
-      .macros .slider { grid-template-columns: 7.8em minmax(0, 1fr) 2.6em; align-items: center; margin: 2px 0; }
-      .macros .slider input { grid-column: auto; order: 1; }
-      .macros .slider span.v { order: 2; }
-      .macros .slider span.l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #sec-make .sub { margin: 12px 0 2px; font-size: 12px; color: #919aaa; text-transform: uppercase; letter-spacing: 0.08em; }
-      #referenceTools { border: 1px solid #2f3d37; border-radius: 8px; padding: 2px 8px; margin: 6px 0; }
-      #referenceTools strong { color: #cfe8da; font-size: 13px; font-weight: 600; margin-right: auto; }
-      #referenceTools .slider { margin: 4px 0; }
-      #blurb { color: #aab4c3; font-size: 13px; margin: 4px 0 0; }
-      #status { color: #7fb; font: 12px ui-monospace, monospace; white-space: pre-wrap; margin-top: 4px; }
-      #hud {
-        position: fixed; left: 12px; bottom: 10px; max-width: calc(100vw - 24px); padding: 6px 10px; background: rgba(12, 13, 16, 0.7); border-radius: 8px;
-        font: 12px ui-monospace, monospace; color: #aab1bd; transition: opacity 0.25s; pointer-events: none;
-      }
-      #hud b { color: #dfe3ea; font-weight: 600; }
-      #meter { display: inline-block; width: 80px; height: 6px; background: #22262e; border-radius: 3px; vertical-align: middle; overflow: hidden; }
-      #meter i { display: block; height: 100%; background: linear-gradient(90deg, #4a8, #fd5); width: 0; }
-      kbd { background: #1b1f27; border: 1px solid #333846; border-radius: 4px; padding: 0 4px; font: 12px ui-monospace, monospace; color: #cfd3da; }
-      .keys { color: #aab4c3; font-size: 13px; line-height: 1.7; }
-      #drop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(20, 40, 80, 0.5); font-size: 22px; pointer-events: none; }
       body.dragging #drop { display: flex; }
-      @media (max-width: 600px) {
-        #panel { top: 8px; left: 8px; width: min(370px, calc(100vw - 16px)); max-height: 60dvh; }
-        #hud { left: 8px; }
-        details.sec > summary .hint { max-width: 55%; text-align: right; }
+      #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 70; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+      .toast {
+        background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 9px 14px;
+        font: 500 10.5px/1.4 var(--mono); color: var(--text); box-shadow: 0 6px 18px rgba(0,0,0,.45); max-width: min(440px, 70vw); animation: toastIn .2s ease-out; transition: opacity .3s;
+      }
+      .toast.err { border-left-color: #ff5a4f; }
+      .toast.out { opacity: 0; }
+      @keyframes toastIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+      /* Simple / Advanced (easy / console): one panel, tiers by attribute. A search shows every tier (it filters rows itself). */
+      html[data-ui='simple']:not([data-searching]) [data-tier='advanced'] { display: none !important; }
+
+      /* ───────────── performance / hidden UI / ?ui=0: the stage alone, full bleed ───────────── */
+      body.hide-ui #app, html[data-capture] #app { position: fixed; inset: 0; display: grid; padding: 0; gap: 0; grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: minmax(0, 1fr) !important; grid-template-areas: 'stage' !important; }
+      body.hide-ui #topbar, body.hide-ui .col, body.hide-ui #centre > :not(.well),
+      html[data-capture] #topbar, html[data-capture] .col, html[data-capture] #centre > :not(.well) { display: none !important; }
+      body.hide-ui .well, html[data-capture] .well { border: 0; border-radius: 0; flex: 1; aspect-ratio: auto; }
+      body.hide-ui .well::after, html[data-capture] .well::after { display: none; }
+
+      /* mid-size console: the two columns stack beside the stage */
+      @media (max-width: 1099px) and (min-width: 900px) {
+        html[data-ui='advanced'] #app, html[data-searching] #app {
+          grid-template-columns: 290px minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'top top' 'left stage' 'right stage';
+        }
+        #topbar .hr .key.cam { max-width: 96px; }
+      }
+      /* narrow: one column, the stage on top (16:9) and pinned while the panels scroll under it */
+      @media (max-width: 899px) {
+        html, body { overflow: visible; height: auto; }
+        body:not(.hide-ui) #app { position: static; display: flex; flex-direction: column; padding: 8px; gap: 8px; }
+        #topbar { order: 0; } #centre { order: 1; } #colLeft { order: 2; } #colRight { order: 3; }
+        #topbar { grid-template-columns: 1fr; gap: 8px; }
+        #topbar .hl { justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        #topbar .hr { justify-content: flex-start; flex-wrap: wrap; }
+        .transport { flex-wrap: wrap; }
+        .transport .key, #topbar .hr .key { height: 36px; }
+        #topbar .hr .key.cam { max-width: 120px; padding-top: 14px; }
+        .status { display: none; }
+        body:not(.hide-ui) #centre { position: sticky; top: 0; z-index: 4; background: var(--case); padding: 4px 0 6px; margin: -4px 0 0; }
+        body:not(.hide-ui) .well { flex: none; aspect-ratio: 16 / 9; }
+        .hints { display: none; }
+        #hud { display: none; }
+        .col { overflow: visible; margin: 0; padding: 0; }
+        #toasts { right: 10px; left: 10px; bottom: 10px; align-items: stretch; }
       }
       @media (prefers-reduced-motion: reduce) {
-        #panel, #hud, #returnUi, details.sec > summary::before { transition: none; }
+        *, *::before, *::after { animation: none !important; transition: none !important; }
       }
     </style>
   </head>
   <body>
-    <div id="stage"></div>
-    <div id="drop">drop audio · video · picture · a model (glb / obj / stl)</div>
-    <div id="countdown" hidden style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:bold 160px system-ui,sans-serif;color:#fff;text-shadow:0 0 40px #000;pointer-events:none"></div>
+    <div id="app">
+      <!-- the chrome: inert while the UI is hidden. display: contents, so its children are the grid's cells -->
+      <div id="panel">
+        <header id="topbar">
+          <div class="hl">
+            <div class="brandbox">
+              <span class="brand">GROWTH</span>
+              <span class="led g" aria-hidden="true"></span>
+              <span id="ver" class="ver"></span>
+              <span id="storageNote" hidden title="browser storage is unavailable: settings and preset slots last for this session only">session only</span>
+            </div>
+            <div class="seg" role="group" aria-label="Panel">
+              <button id="tierEasy" type="button" aria-pressed="true" title="the guided panel: six steps">easy</button>
+              <button id="uiTier" type="button" aria-pressed="false" title="show every setting">console</button>
+            </div>
+            <div class="status" aria-label="Status lights">
+              <span id="ledMidi" class="st" title="MIDI: a device is connected or a note is held"><i class="led"></i>midi</span>
+              <span id="ledAudio" class="st" title="audio: a file is playing, or a mic / tab is live"><i class="led"></i>audio</span>
+              <span id="ledRec" class="st" title="recording"><i class="led"></i>rec</span>
+            </div>
+          </div>
+          <div class="transport" role="group" aria-label="Transport">
+            <button id="clear" class="key w" type="button" title="Backspace — clear the growth">reset</button>
+            <button id="perf" class="key w go" type="button" title="Enter — the stage alone, full screen (Esc comes back)">perform</button>
+            <button id="record" class="key w ink recbtn" type="button" title="R — record a video">rec</button>
+            <button id="still" class="key w" type="button" title="Q — save a still · Shift+Q renders it at 2×">still</button>
+          </div>
+          <div class="hr">
+            <button id="camCycle" class="key cam" type="button" title="C — next camera style · Shift+C previous">framed</button>
+            <button id="camLock" class="key w" type="button" aria-pressed="false" title="V — freeze this view (Reset keeps it)">lock</button>
+            <button id="hideUi" class="key ico" type="button" aria-label="Hide controls" title="hide the controls — F2 or ` · Esc brings them back">
+              <svg width="15" height="13" viewBox="0 0 15 13" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x=".65" y=".65" width="13.7" height="11.7" rx="2" /><path d="M5 .65v11.7" /></svg>
+            </button>
+            <button id="themeBtn" class="key ico" type="button" aria-label="Light or dark console" title="light / dark console">
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3" /><path d="M7 .8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor" /></svg>
+            </button>
+            <button id="fullBtn" class="key ico" type="button" aria-label="Full screen" title="full screen (the controls stay)">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" /></svg>
+            </button>
+          </div>
+        </header>
 
-    <!-- outside the panel: the panel is inert while hidden -->
-    <button id="returnUi" type="button" title="Esc, F2 or `">Show controls · Esc</button>
+        <!-- easy: six numbered steps. Every widget here is a view of the same controls as the console -->
+        <aside id="colLeft" class="col" aria-label="Growth controls">
+          <div class="find">
+            <input id="controlSearch" type="search" autocomplete="off" spellcheck="false" placeholder="find a setting…" aria-label="Find a setting" aria-describedby="searchHelp" />
+            <p id="searchHelp" role="status"></p>
+          </div>
 
-    <div id="panel" role="region" aria-label="Growth controls">
-      <div id="panelTop">
-        <h1>Growth <span id="ver" style="color:#7fb;font-weight:400;font-size:11px"></span> <span style="color:#8a93a3;font-weight:400">— midi / music visualiser</span> <span id="storageNote" hidden title="browser storage is unavailable: settings and preset slots last for this session only">· session only</span></h1>
-        <div class="row" style="margin: 0">
-          <button id="clear" class="primary" title="Backspace">↺ reset</button>
-          <button id="perf" title="Enter">▶ performance</button>
-          <button id="hideUi" title="F2 or ` (the key left of 1)">hide UI</button>
-        </div>
-        <div class="row" style="margin: 5px 0 0">
-          <button id="record" title="R">● rec</button>
-          <select id="recMode" title="how a recording starts">
-            <option value="now">now</option>
-            <option value="count">3 s countdown</option>
-            <option value="note">on next note</option>
-          </select>
-          <button id="still" title="Q · shift+Q renders it at 2×">📷 still</button>
-        </div>
-        <div class="row" style="margin: 5px 0 0">
-          <button id="camCycle" title="C — next camera style · Shift+C previous">🎥 framed</button>
-          <button id="camLock" type="button" aria-pressed="false" title="V — freeze this view (Reset keeps it)">🔓 lock</button>
-          <button id="uiTier" type="button" aria-pressed="false" title="show every setting">Advanced</button>
-        </div>
-        <input id="controlSearch" type="search" autocomplete="off" spellcheck="false" placeholder="Find a setting…" aria-label="Find a setting" aria-describedby="searchHelp" />
-        <p id="searchHelp" role="status"></p>
+          <!-- 1. where the music comes from -->
+          <details class="sec panel step" id="sec-input" open>
+            <summary><i class="num">1</i><b>Source</b><span class="hint" id="inputHint"></span></summary>
+            <div class="body">
+              <div class="seg wide" role="group" aria-label="Input">
+                <button id="modeMidi" type="button" aria-pressed="true" title="MIDI controller or the computer keyboard">midi</button>
+                <button id="modeFile" type="button" aria-pressed="false" title="audio file (mp3, wav, ogg, flac, m4a)">file</button>
+                <button id="modeMic" type="button" aria-pressed="false" title="mic / line in">mic</button>
+                <button id="modeTab" type="button" aria-pressed="false" title="capture a Chrome tab (Spotify web player, YouTube…) or, on Windows, system audio">tab</button>
+              </div>
+              <div class="row" id="midiRow">
+                <select id="midiDevice" class="grow" aria-label="MIDI input"><option value="all">all MIDI inputs</option></select>
+              </div>
+              <div class="row" id="micRow" hidden>
+                <select id="micDevice" class="grow" aria-label="Microphone input"><option value="">default input</option></select>
+              </div>
+              <div class="row" id="fileRow" hidden>
+                <input id="file" type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a" multiple aria-label="Audio files" />
+              </div>
+              <div class="row" id="transport" hidden>
+                <button id="prevBtn" type="button" title="previous track" aria-label="Previous track">⏮</button>
+                <button id="playBtn" type="button" title="Space" aria-label="Play or pause">▶</button>
+                <button id="nextBtn" type="button" title="next track" aria-label="Next track">⏭</button>
+                <input id="seek" class="grow" type="range" min="0" max="1000" value="0" aria-label="Track position" />
+                <span id="timeLbl">0:00 / 0:00</span>
+              </div>
+              <div class="playlist" id="playlist" hidden></div>
+              <div id="audioSensRow" class="ctl-list" hidden></div>
+              <div class="trio">
+                <button id="videoFile" type="button" title="a video steers the growth (not the sound)">video</button>
+                <button id="videoCam" type="button" title="the camera steers the growth">camera</button>
+                <button id="videoImage" type="button" title="growth draws the picture in 3D over time">picture</button>
+              </div>
+              <button id="videoStop" type="button" hidden>stop video</button>
+              <div class="row" id="videoDeviceRow" hidden>
+                <select id="videoDevice" class="grow" aria-label="Camera input"></select>
+              </div>
+              <div id="videoStatus" class="note">a picture, video or camera becomes a 3D shape the music grows over</div>
+              <!-- quick controls: the same values as the Organism's Video section (presets, MIDI learn, saved settings) -->
+              <div id="referenceTools" class="subpanel" hidden>
+                <div class="row">
+                  <strong>3D reference</strong>
+                  <button id="refEnable" type="button" title="guidance on, music-led: notes grow along the picture's lines and relief">use as 3D shape</button>
+                  <button id="refFit" type="button" title="frame the whole picture, face-on (also re-aims a locked view)">fit view</button>
+                </div>
+                <div class="row">
+                  <button id="refBuild" type="button" data-tier="advanced" aria-pressed="false" title="a quiet background fill grows over the picture without music">build shape</button>
+                  <button id="refFollow" type="button" aria-pressed="true" title="growth moves with a playing video or camera">follow live</button>
+                  <button id="refVisible" type="button" aria-pressed="true" title="the picture behind the growth">show</button>
+                  <button id="refInvert" type="button" data-tier="advanced" aria-pressed="false" title="invert depth: dark parts come forward instead of bright ones">invert</button>
+                </div>
+                <label class="slider" for="refSize"><span class="l">size</span><span class="v" id="refSizeValue">22</span><input id="refSize" type="range" min="4" max="60" step="1" value="22" /></label>
+                <label class="slider" for="refDepth"><span class="l">depth</span><span class="v" id="refDepthValue">8</span><input id="refDepth" type="range" min="0" max="25" step="0.5" value="8" /></label>
+                <label class="slider" for="refScatter" data-tier="advanced"><span class="l">spread: details … anywhere</span><span class="v" id="refScatterValue">0.7</span><input id="refScatter" type="range" min="0" max="1" step="0.05" value="0.7" /></label>
+                <div id="refHint" class="note"></div>
+              </div>
+              <div class="row" id="stemsRow" data-tier="advanced" hidden>
+                <button id="stems" type="button" aria-pressed="false" class="grow">stems · drums / bass / voice / other</button>
+              </div>
+              <div class="note">drop audio here for a playlist · shift-drop adds · letters play the keyboard piano</div>
+            </div>
+          </details>
+
+          <!-- 2. the look: the quick way in (Simple shows this, the macros and the top bar) -->
+          <details class="sec panel step" id="sec-make" open>
+            <summary><i class="num">2</i><b>Look</b><span class="hint" id="lookName"></span></summary>
+            <div class="body">
+              <div class="looks" id="looks" role="group" aria-label="Look"></div>
+              <div class="pair">
+                <button id="surprise" type="button" title="another look, lightly varied — what has grown stays (unless fresh canvas)">surprise me</button>
+                <label class="fresh" title="a look or Surprise clears the growth first"><input id="freshCanvas" type="checkbox" /><i class="led"></i>fresh canvas</label>
+              </div>
+            </div>
+          </details>
+
+          <!-- 3. performance macros, in both tiers: each knob moves many controls around the look's own
+               values (0.5 = the look as authored); right-click one to MIDI-learn it -->
+          <details class="sec panel step" id="sec-macros" open>
+            <summary><i class="num">3</i><b>Response</b><span class="hint">0.5 = the look</span></summary>
+            <div class="body">
+              <div id="macros" class="macros knobs" role="group" aria-label="Macros"></div>
+              <p class="note">drag or wheel · double-click: back to 0.5 · right-click: MIDI learn</p>
+            </div>
+          </details>
+
+          <!-- 4. how the camera watches -->
+          <details class="sec panel step" id="sec-camera" open>
+            <summary><i class="num">4</i><b>Camera</b><span class="hint">C cycles · V locks</span></summary>
+            <div class="body">
+              <div id="camStyle" class="camkeys" role="group" aria-label="Camera style">
+                <button type="button" data-cam="framed" aria-pressed="false" title="Framed — keeps all of it in view">framed</button>
+                <button type="button" data-cam="gentle" aria-pressed="false" title="Gentle orbit — framed, circling">orbit</button>
+                <button type="button" data-cam="director" aria-pressed="false" title="Director — cuts on the music">director</button>
+                <button type="button" data-cam="flight" aria-pressed="false" title="Flight — on through the growth">flight</button>
+                <button type="button" data-cam="still" aria-pressed="false" title="Still — hold this view">still</button>
+                <button type="button" data-cam="manual" aria-pressed="false" title="Manual — drag and wheel">manual</button>
+              </div>
+              <p id="camOther" class="note" hidden></p>
+            </div>
+          </details>
+
+          <!-- 5. a picture, video or model to grow over -->
+          <details class="sec panel step" id="sec-draw" open>
+            <summary><i class="num">5</i><b>Draw a source</b><span class="hint">optional</span></summary>
+            <div class="body">
+              <div class="intents" role="group" aria-label="Draw a source">
+                <button id="srcTrace" type="button" aria-pressed="false" title="music draws along a picture's lines (asks for a picture when none is open)">trace details</button>
+                <button id="srcRelief" type="button" aria-pressed="false" title="music grows across a picture's relief (asks for a picture when none is open)">grow over relief</button>
+                <button id="srcModel" type="button" aria-pressed="false" title="music builds the surface of a 3D model (asks for one when none is loaded)">skin 3D model</button>
+                <button id="srcOff" type="button" aria-pressed="false" title="no picture, video, camera or model: the music grows freely">music only</button>
+              </div>
+              <div class="row">
+                <button id="modelPick" type="button" title="glb, gltf, obj or stl — or drop one on the page">load 3D model…</button>
+                <input id="modelFile" type="file" accept=".glb,.gltf,.obj,.stl" hidden />
+                <span class="note">video · camera · picture: in 1</span>
+              </div>
+            </div>
+          </details>
+
+          <!-- 6. getting it out (the full Output panel is in the console) -->
+          <details class="sec panel step" id="sec-export" open>
+            <summary><i class="num">6</i><b>Export</b><span class="hint">R · Q</span></summary>
+            <div class="body">
+              <div class="pair">
+                <button id="recKey" type="button" class="ink recbtn" data-rec-key title="R — record a video">rec</button>
+                <button id="stillKey" type="button" title="Q — save a still · Shift-click renders it at 2×">save still</button>
+              </div>
+              <div class="row">
+                <label class="lbl" for="recMode">start</label>
+                <select id="recMode" class="grow" title="how a recording starts">
+                  <option value="now">now</option>
+                  <option value="count">3 s countdown</option>
+                  <option value="note">on the next note</option>
+                </select>
+              </div>
+              <div id="recSummary" class="note"></div>
+              <button id="moreOutput" type="button" class="elink">all output settings ›</button>
+            </div>
+          </details>
+        </aside>
+
+        <!-- console: every setting, dense -->
+        <aside id="colRight" class="col" data-tier="advanced" aria-label="Console">
+          <!-- what it draws -->
+          <details class="sec panel" id="sec-pattern" open>
+            <summary><b>Pattern</b><span class="hint">1–5</span></summary>
+            <div class="body">
+              <div class="engines" id="engines" role="group" aria-label="Pattern"></div>
+              <p id="blurb" class="note"></p>
+              <!-- quick: the same value as Look → growth shader (presets, MIDI learn, saved settings) -->
+              <div class="row" id="materialQuick" data-search="growth shader surface" hidden>
+                <select id="materialPick" class="grow" aria-label="Material"></select>
+                <button id="materialNext" type="button" title="the next of the ten animated surfaces">next ›</button>
+              </div>
+            </div>
+          </details>
+
+          <!-- the selected pattern's own settings, grouped by the engine -->
+          <div id="engineControls" style="display: contents"></div>
+
+          <!-- settings shared by every pattern -->
+          <details class="sec panel" id="sec-global">
+            <summary><b>Shared</b><span class="hint">zoom · palette · decay</span></summary>
+            <div class="body">
+              <div class="row"><label class="lbl" for="palette">palette</label><select id="palette" class="grow"></select></div>
+              <div id="globalControls"></div>
+            </div>
+          </details>
+
+          <details class="sec panel" id="sec-presets">
+            <summary><b>Presets</b><span class="hint">click load · shift+click save</span></summary>
+            <div class="body">
+              <div class="presets" id="presets" role="group" aria-label="Preset slots"></div>
+              <div class="pair">
+                <button id="randomMix" type="button" title="one of the looks, lightly varied — shift+click a slot to keep it">surprise me</button>
+                <button id="wildMix" type="button" title="randomise the look and behaviour, anything goes — shift+click a slot to keep one">wild mix</button>
+              </div>
+              <div id="presetStatus" class="note">shift+1…8 or a MIDI program change also switch slots; sliders morph over 2 s</div>
+            </div>
+          </details>
+
+          <details class="sec panel" id="sec-play">
+            <summary><b>Play</b><span class="hint">instrument · gestures · midi map</span></summary>
+            <div class="body">
+              <div class="row">
+                <label class="lbl" for="instrument">instrument</label><select id="instrument" class="grow"></select>
+              </div>
+              <div class="row">
+                <label class="lbl" for="instVol">vol</label><input id="instVol" class="grow" type="range" min="0" max="1" step="0.02" value="0.5" />
+              </div>
+              <div class="pair">
+                <button id="soundBack" type="button" aria-pressed="false">sound-back</button>
+                <button id="gestures" type="button" aria-pressed="false">gestures (webcam)</button>
+              </div>
+              <div class="row">
+                <input id="textIn" class="grow" type="text" placeholder="words to grow (typography = typed text)" maxlength="32" aria-label="Words to grow" />
+                <button id="textGo" type="button">grow</button>
+              </div>
+              <div class="row">
+                <button id="ccClear" type="button" title="forget all MIDI CC mappings">clear MIDI map</button>
+                <span class="note">right-click a control, then move a knob</span>
+              </div>
+              <div id="interactStatus" class="mono-ok"></div>
+            </div>
+          </details>
+
+          <details class="sec panel" id="sec-output">
+            <summary><b>Output</b><span class="hint">record · still · cast</span></summary>
+            <div class="body">
+              <div class="row"><label class="lbl" for="recFormat">file</label><select id="recFormat" class="grow"></select></div>
+              <div class="row"><label class="lbl" for="recSize">size</label><select id="recSize" class="grow"></select></div>
+              <div class="row">
+                <label class="lbl" for="recFps">fps</label><select id="recFps"><option value="30">30</option><option value="60">60</option></select>
+                <label class="lbl" for="recQuality">quality</label><select id="recQuality" class="grow"></select>
+              </div>
+              <div class="row">
+                <label class="lbl" for="recAudio">sound</label>
+                <select id="recAudio" class="grow">
+                  <option value="mix" title="input + instrument + sound-back">full mix · everything heard</option>
+                  <option value="input" title="the audio file, microphone or tab, without the instrument or sound-back">input only · file / mic / tab</option>
+                </select>
+              </div>
+              <div class="row" id="recStreamRow" hidden>
+                <label class="fresh" title="streams the take into a file you choose at the start — for long takes; the index goes at the end of the file"><input id="recStream" type="checkbox" /><i class="led"></i>save while recording</label>
+              </div>
+              <div id="recFormatNote" class="note"></div>
+              <div id="recStatus" class="mono-ok"></div>
+              <div class="row">
+                <input id="castUrl" class="grow" type="text" placeholder="http://mediamtx:8889/growth/whip" aria-label="WHIP stream address" />
+                <button id="cast" type="button">cast</button>
+              </div>
+              <div id="castStatus" class="note">WHIP to mediamtx; the compositor pulls it as a <b>whep</b> clip at …/growth/whep</div>
+              <div class="row">
+                <button id="copyCaptureUrl" type="button">copy capture URL</button>
+                <span id="captureStatus" class="mono-ok"></span>
+              </div>
+              <div class="note">
+                For Syphon / Spout: open that URL as an OBS <b>Browser Source</b>, then send it on — Windows <b>obs-spout2</b> → Spout;
+                macOS an OBS Syphon plugin, or <b>DistroAV</b> (NDI) → NDI Syphon. Resolume / TouchDesigner / MadMapper take NDI directly.
+              </div>
+            </div>
+          </details>
+
+          <details class="sec panel" id="sec-keys">
+            <summary><b>Keys</b><span class="hint">shortcuts</span></summary>
+            <div class="body keys">
+              <kbd>1</kbd>–<kbd>5</kbd> pattern · <kbd>Enter</kbd> perform · <kbd>F2</kbd> or <kbd>`</kbd> hide UI (<kbd>`</kbd>: the key left of <kbd>1</kbd>, no Fn needed on a Mac) · <kbd>Esc</kbd> show UI ·
+              <kbd>Tab</kbd> next control · <kbd>Backspace</kbd> reset · <kbd>[</kbd> <kbd>]</kbd> palette · <kbd>Space</kbd> play/pause ·
+              <kbd>↑</kbd><kbd>↓</kbd> zoom · <kbd>←</kbd><kbd>→</kbd> mirror folds ·
+              <kbd>R</kbd> record · <kbd>Q</kbd> still · <kbd>C</kbd> camera · <kbd>V</kbd> lock the view · <kbd>Shift</kbd>+<kbd>1</kbd>…<kbd>8</kbd> preset<br />
+              shortcuts work unless you are typing in a text field; a focused slider or knob keeps its arrow keys<br />
+              mouse: middle-drag (or <kbd>Alt</kbd>+drag) orbit · <kbd>Shift</kbd>+middle-drag or right-drag pan · wheel zoom · double-click resets them<br />
+              piano: <kbd>A</kbd>…<kbd>K</kbd> white keys, <kbd>W</kbd>…<kbd>U</kbd> black, <kbd>Z</kbd>/<kbd>X</kbd> octave, <kbd>Shift</kbd> for full velocity
+            </div>
+          </details>
+        </aside>
       </div>
 
-      <!-- 0. performance macros, in both tiers: each knob moves many controls around the look's own
-           values (0.5 = the look as authored); right-click one to MIDI-learn it -->
-      <details class="sec" id="sec-macros" open>
-        <summary>Macros <span class="hint">0.5 = the look · double-click resets</span></summary>
-        <div class="body"><div id="macros" class="macros" role="group" aria-label="Macros"></div></div>
-      </details>
-
-      <!-- the quick way in (Simple shows this, the macros, Input and the top bar): every widget here
-           is a view of the same controls as the Advanced panel -->
-      <details class="sec" id="sec-make" open>
-        <summary>Make something <span class="hint" id="lookName"></span></summary>
-        <div class="body">
-          <div class="looks" id="looks" role="group" aria-label="Look"></div>
-          <div class="row">
-            <button id="surprise" type="button" class="primary" title="another look, lightly varied — what has grown stays (unless fresh canvas)">✨ Surprise me</button>
-            <label class="note" style="margin: 0" title="a look or Surprise clears the growth first"><input id="freshCanvas" type="checkbox" /> fresh canvas</label>
-          </div>
-          <div id="audioSensRow" class="ctl-list" hidden></div>
-          <div class="row">
-            <label for="camStyle">Camera</label>
-            <select id="camStyle" style="flex: 1; min-width: 0">
-              <option value="framed">Framed — keeps all of it in view</option>
-              <option value="gentle">Gentle orbit — framed, circling</option>
-              <option value="director">Director — cuts on the music</option>
-              <option value="flight">Flight — on through the growth</option>
-              <option value="still">Still — hold this view</option>
-              <option value="manual">Manual — drag and wheel</option>
-              <option value="other" hidden disabled></option>
-            </select>
-          </div>
-          <div class="sub">Draw a source</div>
-          <div class="intents" role="group" aria-label="Draw a source">
-            <button id="srcTrace" type="button" aria-pressed="false" title="music draws along a picture's lines (asks for a picture when none is open)">Trace details</button>
-            <button id="srcRelief" type="button" aria-pressed="false" title="music grows across a picture's relief (asks for a picture when none is open)">Grow over relief</button>
-            <button id="srcModel" type="button" aria-pressed="false" title="music builds the surface of a 3D model (asks for one when none is loaded)">Skin 3D model</button>
-            <button id="srcOff" type="button" aria-pressed="false" title="no picture, video, camera or model: the music grows freely">Music only</button>
-          </div>
-          <div class="row">
-            <button id="modelPick" type="button" title="glb, gltf, obj or stl — or drop one on the page">Load 3D model…</button>
-            <input id="modelFile" type="file" accept=".glb,.gltf,.obj,.stl" hidden />
-            <span class="note" style="margin: 0">video · camera · picture: in Input</span>
-          </div>
+      <!-- the stage: its own inset well; perform / F2 / ` / ?ui=0 make it full bleed -->
+      <main id="centre">
+        <div class="well" id="well">
+          <div id="stage"></div>
+          <div id="countdown" hidden></div>
         </div>
-      </details>
-
-      <!-- 1. where the music comes from -->
-      <details class="sec" id="sec-input" open>
-        <summary>Input <span class="hint" id="inputHint"></span></summary>
-        <div class="body">
-          <div class="row">
-            <button id="modeMidi" class="active">MIDI</button>
-            <button id="modeFile">Audio file</button>
-            <button id="modeMic">Mic / line in</button>
-            <button id="modeTab" title="capture a Chrome tab (Spotify web player, YouTube…) or, on Windows, system audio">Tab / system audio</button>
-          </div>
-          <div class="row" id="midiRow">
-            <select id="midiDevice" style="flex:1" aria-label="MIDI input"><option value="all">all MIDI inputs</option></select>
-          </div>
-          <div class="row" id="micRow" hidden>
-            <select id="micDevice" style="flex:1" aria-label="Microphone input"><option value="">default input</option></select>
-          </div>
-          <div class="row" id="fileRow" hidden>
-            <input id="file" type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a" multiple aria-label="Audio files" />
-          </div>
-          <div class="row" id="transport" hidden>
-            <button id="prevBtn" title="previous track" aria-label="Previous track">⏮</button>
-            <button id="playBtn" title="Space" aria-label="Play or pause">▶</button>
-            <button id="nextBtn" title="next track" aria-label="Next track">⏭</button>
-            <input id="seek" type="range" min="0" max="1000" value="0" style="flex:1; margin:0" aria-label="Track position" />
-            <span id="timeLbl" style="font: 11px ui-monospace, monospace; color:#9ad">0:00 / 0:00</span>
-          </div>
-          <div class="playlist" id="playlist" hidden></div>
-          <div class="row">
-            <button id="videoFile">🎞 video file</button>
-            <button id="videoCam">📷 camera</button>
-            <button id="videoImage" title="growth draws the picture in 3D over time">🖼 picture</button>
-            <button id="videoStop" hidden>stop video</button>
-          </div>
-          <div class="row" id="videoDeviceRow" hidden>
-            <select id="videoDevice" style="flex:1" aria-label="Camera input"></select>
-          </div>
-          <div id="videoStatus" class="note">a picture, video or camera becomes a 3D shape the music grows over</div>
-          <!-- quick controls: the same values as the Organism's Video section (presets, MIDI learn, saved settings) -->
-          <div id="referenceTools" hidden>
-            <div class="row">
-              <strong>3D reference</strong>
-              <button id="refEnable" type="button" title="guidance on, music-led: notes grow along the picture's lines and relief">Use as 3D shape</button>
-              <button id="refFit" type="button" title="frame the whole picture, face-on (also re-aims a locked view)">Fit view</button>
-            </div>
-            <div class="row">
-              <button id="refBuild" type="button" data-tier="advanced" aria-pressed="false" title="a quiet background fill grows over the picture without music">Build shape</button>
-              <button id="refFollow" type="button" aria-pressed="true" title="growth moves with a playing video or camera">Follow live</button>
-              <button id="refVisible" type="button" aria-pressed="true" title="the picture behind the growth">Show</button>
-              <button id="refInvert" type="button" data-tier="advanced" aria-pressed="false" title="invert depth: dark parts come forward instead of bright ones">Invert</button>
-            </div>
-            <label class="slider" for="refSize"><span class="l">Size</span><span class="v" id="refSizeValue">22</span><input id="refSize" type="range" min="4" max="60" step="1" value="22" /></label>
-            <label class="slider" for="refDepth"><span class="l">Depth</span><span class="v" id="refDepthValue">8</span><input id="refDepth" type="range" min="0" max="25" step="0.5" value="8" /></label>
-            <label class="slider" for="refScatter" data-tier="advanced"><span class="l">Spread: details … anywhere</span><span class="v" id="refScatterValue">0.7</span><input id="refScatter" type="range" min="0" max="1" step="0.05" value="0.7" /></label>
-            <div id="refHint" class="note"></div>
-          </div>
-          <div class="row" id="stemsRow" data-tier="advanced" hidden>
-            <button id="stems">🥁 stems (drums / bass / voice / other)</button>
-          </div>
-          <div class="note">drop audio files here for a playlist · shift-drop to add · letters play the keyboard piano</div>
-          <div id="status" role="status">…</div>
+        <div class="lcdrow">
+          <div id="status" class="lcd" role="status">…</div>
+          <div id="hud" class="lcd" aria-label="Live readout"><b id="hudEngine"></b><span class="hz">·</span><span id="hudInput"></span><span class="hz">·</span>notes <b id="hudNotes">–</b><span class="hz">·</span><span id="meter"><i></i></span><span class="hz">·</span><b id="hudBpm">–</b> bpm<span class="wide"><span class="hz">·</span>zoom <b id="hudZoom">1.00</b></span><span class="hz">·</span><b id="hudFps">–</b> fps<span id="hudRec"></span><span class="wide"><span class="hz">·</span><span id="hudVer"></span></span></div>
         </div>
-      </details>
-
-      <!-- 2. what it draws -->
-      <details class="sec" id="sec-pattern" data-tier="advanced" open>
-        <summary>Pattern</summary>
-        <div class="body">
-          <div class="engines" id="engines"></div>
-          <p id="blurb"></p>
-          <!-- quick: the same value as Look → growth shader (presets, MIDI learn, saved settings) -->
-          <div class="row" id="materialQuick" data-search="growth shader surface" hidden>
-            <label for="materialPick">Material</label>
-            <select id="materialPick" style="flex: 1; min-width: 0"></select>
-            <button id="materialNext" type="button" title="the next of the ten animated surfaces">Next new ▸</button>
-          </div>
+        <div class="hints" aria-hidden="true">
+          <span><kbd>A</kbd>–<kbd>K</kbd>play</span><span><kbd>Enter</kbd>perform</span><span><kbd>R</kbd>rec</span><span><kbd>Q</kbd>still</span><span><kbd>C</kbd>camera</span><span><kbd>⌫</kbd>reset</span><span><kbd>F2</kbd>hide</span><span><kbd>⇧</kbd><kbd>1</kbd>–<kbd>8</kbd>presets</span>
         </div>
-      </details>
-
-      <!-- 3. the selected pattern's own settings, grouped by the engine -->
-      <div id="engineControls" data-tier="advanced"></div>
-
-      <!-- 4. settings shared by every pattern -->
-      <details class="sec" id="sec-global" data-tier="advanced">
-        <summary>Shared <span class="hint">zoom · palette · decay</span></summary>
-        <div class="body">
-          <div class="row"><label>palette <select id="palette"></select></label></div>
-          <div id="globalControls"></div>
-        </div>
-      </details>
-
-      <!-- 5. presets -->
-      <details class="sec" id="sec-presets" data-tier="advanced">
-        <summary>Presets <span class="hint">click load · shift+click save</span></summary>
-        <div class="body">
-          <div class="presets" id="presets"></div>
-          <div class="row">
-            <button id="randomMix" title="one of the six looks, lightly varied — shift+click a slot to keep it">✨ Surprise me</button>
-            <button id="wildMix" title="randomise the look and behaviour, anything goes — shift+click a slot to keep one">🎲 wild mix</button>
-          </div>
-          <div id="presetStatus" class="note">shift+1…8 or a MIDI program change also switch slots; sliders morph over 2 s</div>
-        </div>
-      </details>
-
-      <!-- 6. playing it -->
-      <details class="sec" id="sec-play" data-tier="advanced">
-        <summary>Play <span class="hint">instrument · gestures · MIDI map</span></summary>
-        <div class="body">
-          <div class="row">
-            <label>instrument <select id="instrument"></select></label>
-            <label>vol <input id="instVol" type="range" min="0" max="1" step="0.02" value="0.5" style="width:70px" /></label>
-          </div>
-          <div class="row">
-            <button id="soundBack">🔈 sound-back</button>
-            <button id="gestures">🖐 gestures (webcam)</button>
-          </div>
-          <div class="row">
-            <input id="textIn" type="text" style="flex:1" placeholder="words to grow (set typography = typed text)" maxlength="32" aria-label="Words to grow" />
-            <button id="textGo">grow</button>
-          </div>
-          <div class="row">
-            <button id="ccClear" title="forget all MIDI CC mappings">clear MIDI map</button>
-            <span class="note" style="margin:0">right-click a slider, then move a knob</span>
-          </div>
-          <div id="interactStatus" style="color:#7fb;font:11px ui-monospace,monospace;white-space:pre-wrap"></div>
-        </div>
-      </details>
-
-      <!-- 7. getting it out -->
-      <details class="sec" id="sec-output" data-tier="advanced">
-        <summary>Output <span class="hint">record · still · cast</span></summary>
-        <div class="body">
-          <div class="row">
-            <label style="flex:1">file <select id="recFormat" style="flex:1"></select></label>
-          </div>
-          <div class="row">
-            <label>size <select id="recSize"></select></label>
-            <label>fps <select id="recFps"><option value="30">30</option><option value="60">60</option></select></label>
-          </div>
-          <div class="row">
-            <label>quality <select id="recQuality"></select></label>
-          </div>
-          <div class="row">
-            <label style="flex:1">sound
-              <select id="recAudio" style="flex:1">
-                <option value="mix" title="input + instrument + sound-back">Full mix · everything heard</option>
-                <option value="input" title="the audio file, microphone or tab, without the instrument or sound-back">Input only · file / mic / tab</option>
-              </select>
-            </label>
-          </div>
-          <div class="row" id="recStreamRow" hidden>
-            <label title="streams the take into a file you choose at the start — for long takes; the index goes at the end of the file"><input id="recStream" type="checkbox" /> save while recording (pick the file first)</label>
-          </div>
-          <div id="recFormatNote" class="note"></div>
-          <div id="recStatus" class="note" style="color:#7fb; font-family: ui-monospace, monospace"></div>
-          <div class="row">
-            <input id="castUrl" type="text" style="flex:1" placeholder="http://mediamtx:8889/growth/whip" aria-label="WHIP stream address" />
-            <button id="cast">cast</button>
-          </div>
-          <div id="castStatus" class="note">WHIP to mediamtx; the compositor pulls it as a <b>whep</b> clip at …/growth/whep</div>
-          <div class="row">
-            <button id="copyCaptureUrl">copy capture URL</button>
-            <span id="captureStatus" style="color:#7fb"></span>
-          </div>
-          <div class="note">
-            For Syphon / Spout: open that URL as an OBS <b>Browser Source</b>, then send it on — Windows <b>obs-spout2</b> → Spout;
-            macOS an OBS Syphon plugin, or <b>DistroAV</b> (NDI) → NDI Syphon. Resolume / TouchDesigner / MadMapper take NDI directly.
-          </div>
-        </div>
-      </details>
-
-      <!-- 8. reference -->
-      <details class="sec" id="sec-keys" data-tier="advanced">
-        <summary>Keys</summary>
-        <div class="body keys">
-          <kbd>1</kbd>–<kbd>5</kbd> pattern · <kbd>Enter</kbd> performance · <kbd>F2</kbd> or <kbd>`</kbd> hide UI (<kbd>`</kbd>: the key left of <kbd>1</kbd>, no Fn needed on a Mac) · <kbd>Esc</kbd> show UI ·
-          <kbd>Tab</kbd> next control · <kbd>Backspace</kbd> reset · <kbd>[</kbd> <kbd>]</kbd> palette · <kbd>Space</kbd> play/pause ·
-          <kbd>↑</kbd><kbd>↓</kbd> zoom · <kbd>←</kbd><kbd>→</kbd> mirror folds ·
-          <kbd>R</kbd> record · <kbd>Q</kbd> still · <kbd>C</kbd> camera · <kbd>V</kbd> lock the view · <kbd>Shift</kbd>+<kbd>1</kbd>…<kbd>8</kbd> preset<br />
-          shortcuts work unless you are typing in a text field; a focused slider keeps its arrow keys<br />
-          mouse: middle-drag (or <kbd>Alt</kbd>+drag) orbit · <kbd>Shift</kbd>+middle-drag or right-drag pan · wheel zoom · double-click resets them<br />
-          piano: <kbd>A</kbd>…<kbd>K</kbd> white keys, <kbd>W</kbd>…<kbd>U</kbd> black, <kbd>Z</kbd>/<kbd>X</kbd> octave, <kbd>Shift</kbd> for full velocity
-        </div>
-      </details>
+      </main>
     </div>
 
-    <div id="hud"><b id="hudEngine"></b> · <span id="hudInput"></span> · notes <b id="hudNotes">–</b> · <span id="meter"><i></i></span> · <b id="hudBpm">–</b> bpm · zoom <b id="hudZoom">1.00</b> · <b id="hudFps">–</b> fps<span id="hudRec"></span> · <span id="hudVer"></span></div>
+    <div id="drop">drop audio · video · picture · a model</div>
+    <!-- outside the panel: the panel is inert while hidden -->
+    <button id="returnUi" class="key w" type="button" title="Esc, F2 or `">show controls · esc</button>
+    <div id="toasts" class="ui-overlay" aria-live="polite"></div>
 
     <script type="module" src="/src/midi/main.ts"></script>
   </body>

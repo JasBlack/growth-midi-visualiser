@@ -89,7 +89,7 @@ function entriesOf(sec: HTMLDetailsElement): HTMLElement[] {
   const out: HTMLElement[] = []
   for (const el of body.children) {
     if (!(el instanceof HTMLElement)) continue
-    if (el.matches('.icons, .engines, .looks, .intents, .ctl-list, #globalControls')) out.push(...(el.children as HTMLCollectionOf<HTMLElement>))
+    if (el.matches('.icons, .engines, .looks, .intents, .knobs, .camkeys, .trio, .ctl-list, #globalControls')) out.push(...(el.children as HTMLCollectionOf<HTMLElement>))
     else out.push(el)
   }
   return out

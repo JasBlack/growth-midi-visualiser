@@ -7,6 +7,15 @@ growths bind into one structure. Feed it MIDI, an audio file or a microphone.
 
 Vite + TypeScript + three (WebGPU, WebGL2 fallback). No backend.
 
+## New in v0.23.0 — a new look for the controls
+
+The interface now belongs to the same family as Code Painter (paint.jas.black)
+and SnipSnap (snap.jas.black): a dark hardware console with LED keys, an
+**easy | console** switch, numbered steps on the left (source, look tiles,
+response knobs, camera, draw a source, export), the visual in a framed stage
+with a green status line, and a light/dark theme. **perform**, F2 or ` still
+give a full-screen stage with no controls.
+
 ## Since v0.22.0 — Flight on any look, music breath
 
 - **Flight with every look:** pick the **Flight** camera (Simple mode's camera

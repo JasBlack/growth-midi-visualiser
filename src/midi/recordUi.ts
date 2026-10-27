@@ -11,6 +11,7 @@
 import type { Engine } from './engine'
 import { audioContext, busNode, recordingStream, type RecordBus } from './audioCtx'
 import { Recorder, probeRecording, captureSize, bitrateFor, stamp, type RecCapabilities, type RecFormat, type RecQuality, type RecSize, type SaveTarget } from './recorder'
+import { toast } from './ui/toast'
 
 export interface RecSettings {
   /** RecFormat id: 'mp4' | 'webm' | 'mr:<mime>' */
@@ -48,7 +49,7 @@ export interface RecordHost {
   inputMode(): 'midi' | 'file' | 'mic' | 'tab'
 }
 
-type TakeState = 'idle' | 'preparing' | 'counting' | 'armed' | 'starting' | 'recording' | 'stopping'
+export type TakeState = 'idle' | 'preparing' | 'counting' | 'armed' | 'starting' | 'recording' | 'stopping'
 
 interface SavePickerWindow {
   showSaveFilePicker(o: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }): Promise<FileSystemFileHandle>
@@ -76,6 +77,8 @@ export function setupRecording(host: RecordHost) {
   let held: Engine | null = null
   let busLabel = ''
   const btn = $<HTMLButtonElement>('record')
+  /** the top bar's rec key and its copies (easy's Export step): one take, every key shows it */
+  const keys = [btn, ...document.querySelectorAll<HTMLButtonElement>('[data-rec-key]')]
   const countdown = $('countdown')
 
   const formatNow = (): RecFormat | null => caps.formats.find((f) => f.id === rs.format) ?? caps.formats[0] ?? null
@@ -86,18 +89,22 @@ export function setupRecording(host: RecordHost) {
   }
 
   function render() {
+    // the key's dot is its LED (red while a take runs, violet while armed): the words stay short
     const text: Record<TakeState, string> = {
-      idle: '● rec',
+      idle: 'rec',
       preparing: '…',
       counting: 'cancel',
       armed: 'cancel',
       starting: '…',
-      recording: '■ stop',
+      recording: 'stop',
       stopping: 'saving…',
     }
-    btn.textContent = text[st]
-    btn.classList.toggle('rec', st === 'starting' || st === 'recording' || st === 'stopping')
-    btn.disabled = st === 'preparing' || st === 'stopping'
+    for (const k of keys) {
+      k.textContent = text[st]
+      k.dataset.state = st
+      k.classList.toggle('rec', st === 'starting' || st === 'recording' || st === 'stopping')
+      k.disabled = st === 'preparing' || st === 'stopping'
+    }
     for (const id of OPTION_IDS) $<HTMLInputElement>(id).disabled = st !== 'idle'
   }
 
@@ -145,6 +152,10 @@ export function setupRecording(host: RecordHost) {
           ? 'Regular MP4 (not fragmented) at a constant frame rate, index at the front — made for Quick Look, QuickTime, VLC and Resolve.'
           : 'WebM plays in browsers and VLC; Quick Look, QuickTime and Resolve want the MP4.'
     $('recFormatNote').textContent = `${note} While recording, the stage renders at exactly the chosen size (letterboxed on screen). MIDI sessions record the full mix.`
+    // easy's Export step: what a take will be, in one line
+    $('recSummary').textContent = fmt
+      ? `${fmt.ext} · ${rs.size === 'canvas' ? `${width}×${height}` : `${height}p`}${rs.fps} · ${QUALITY_LABELS[rs.quality].toLowerCase()} · ${rs.audio === 'mix' ? 'full mix' : 'input only'}`
+      : 'this browser cannot record video'
   }
 
   function wireOptions() {
@@ -171,10 +182,12 @@ export function setupRecording(host: RecordHost) {
     }
     $<HTMLSelectElement>('recQuality').onchange = (e) => {
       rs.quality = (e.target as HTMLSelectElement).value as RecQuality
+      refresh()
       host.save()
     }
     $<HTMLSelectElement>('recAudio').onchange = (e) => {
       rs.audio = (e.target as HTMLSelectElement).value === 'input' ? 'input' : 'mix'
+      refresh()
       host.save()
     }
     $<HTMLInputElement>('recStream').onchange = (e) => {
@@ -295,6 +308,7 @@ export function setupRecording(host: RecordHost) {
     st = 'idle'
     render()
     say(msg)
+    toast(msg, /fail|problem|could not/i.test(msg) ? 'err' : 'ok')
   }
 
   async function cancelTake(msg: string) {
@@ -328,6 +342,7 @@ export function setupRecording(host: RecordHost) {
       st = 'idle'
       render()
       say(err)
+      if (err !== 'recording cancelled') toast(err, 'err')
       return
     }
     const how = host.settings.recMode
@@ -356,7 +371,7 @@ export function setupRecording(host: RecordHost) {
     host.settings.recMode = (e.target as HTMLSelectElement).value
     host.save()
   }
-  btn.onclick = () => void toggle()
+  for (const k of keys) k.onclick = () => void toggle()
   window.addEventListener('beforeunload', (e) => {
     if (st === 'recording' || st === 'stopping') e.preventDefault()
   })
@@ -367,6 +382,8 @@ export function setupRecording(host: RecordHost) {
     toggle,
     /** Anything but idle: engine switching must wait. */
     busy: () => st !== 'idle',
+    /** where the take is (the top bar's rec light) */
+    state: (): TakeState => st,
     /** From the loop, before the engine draws: an armed take starts on this frame's first note-on. */
     notes(events: readonly { kind: string }[]) {
       if (st === 'armed' && events.some((e) => e.kind === 'on')) {

@@ -24,7 +24,8 @@ records clean MP4/WebM in the browser.
 ## Folder structure
 
 ```
-index.html                    panel markup + CSS (Simple/Advanced tiers via data-tier attributes)
+index.html                    UI markup + CSS, inline (JAS.BLACK console look, docs/ui-ref/DESIGN.md): top bar,
+                              easy steps (left), stage well, console column (right); tiers via data-tier
 src/vite-env.d.ts
 src/midi/
   main.ts                     app wiring: inputs, panel/widgets, ctls map, presets + morph, CC learn,
@@ -52,6 +53,8 @@ src/midi/
   audioCtx.ts pcmTap.ts       one shared 48 kHz AudioContext, recording buses, AudioWorklet PCM tap
   recorder.ts recordUi.ts     WebCodecs recorder (CFR, fixed capture size), Output panel logic
   looks.ts simpleUi.ts macros.ts   authored looks, Simple-mode card, macro knobs
+  ui/                         dom.ts (LED-key state, fader fill) knob.ts (LED-ring knob over a range input)
+                              theme.ts (light/dark + baked dot grid) lookTiles.ts (look thumbnails) toast.ts
   keys.ts panelSearch.ts storage.ts presets.ts synth.ts cast.ts vision.ts videoField.ts color.ts version.ts
 src/vision/                   MediaPipe face/hand landmarker wrapper
 scripts/

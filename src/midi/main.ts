@@ -28,8 +28,12 @@ import { ANIMATED_START } from './shaders'
 import { classifyTarget, controlOwnsKey, focusedByKeyboard, ignoredKey, trackFocusOrigin } from './keys'
 import { PanelSearch } from './panelSearch'
 import { readStored, writeStored } from './storage'
-import { setupSimple, type SimpleSettings } from './simpleUi'
+import { setupSimple, type SimpleSettings, type WidgetOpts } from './simpleUi'
 import { RENAMED_MACROS, loadMacroBases, loadMacroPositions, neutralMacros } from './macros'
+import { paintRange, paintRangesOnInput, setPressed } from './ui/dom'
+import { makeKnob } from './ui/knob'
+import { asTheme, setupTheme, applyTheme, type Theme } from './ui/theme'
+import { toast } from './ui/toast'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -78,6 +82,8 @@ interface Settings extends SimpleSettings {
   rec: RecSettings
   /** audio attack sensitivity 0..1 (0.5 = the v0.15 onset detector) */
   audioSens: number
+  /** the console's colours (the stage is dark either way) */
+  theme: Theme
 }
 const LS = 'midiviz_settings_v3'
 const settings: Settings = {
@@ -101,6 +107,7 @@ const settings: Settings = {
   recMode: 'now',
   rec: { ...REC_DEFAULTS },
   audioSens: 0.5,
+  theme: 'dark',
   uiMode: 'simple',
   look: '',
   macros: neutralMacros(),
@@ -120,6 +127,7 @@ let organismUntouched = true
   const unit = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : d)
   settings.audioSens = unit(settings.audioSens, 0.5)
   settings.uiMode = settings.uiMode === 'advanced' ? 'advanced' : 'simple'
+  settings.theme = asTheme(settings.theme)
   settings.look = typeof settings.look === 'string' ? settings.look : ''
   // v0.20's growth / detail macros: Energy and Complexity took them over, knob and MIDI mapping alike
   settings.macros = loadMacroPositions(s.macros)
@@ -185,12 +193,16 @@ let learning: Ctl | null = null
 
 function setStatus(s: string) {
   statusEl.textContent = s
+  statusEl.title = s // the line cuts long messages; the full one on hover
 }
 function setInteract(s: string) {
   $('interactStatus').textContent = s
 }
 
-function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: number) => void): Ctl {
+/** An on/off control (0 / 1 in whole steps) shows as an LED switch instead of a two-stop fader. */
+const isSwitch = (c: EngineControl) => !c.options && !c.icon && c.min === 0 && c.max === 1 && c.step === 1
+
+function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: number) => void, opts: WidgetOpts = {}): Ctl {
   const wrap = document.createElement('div')
   wrap.className = 'slider'
   const l = document.createElement('span')
@@ -206,10 +218,34 @@ function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: n
   refreshCc()
   wrap.dataset.search = c.key // "Find a setting" also knows controls by their key
   let ctl: Ctl
-  if (c.options) {
+  if (isSwitch(c) && !opts.knob) {
+    // an LED key: on / off, the label beside it
+    wrap.classList.add('tog')
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'sw'
+    b.setAttribute('aria-label', c.label)
+    const show = (n: number) => {
+      c.value = n
+      b.setAttribute('aria-pressed', String(n > 0))
+      b.textContent = n > 0 ? 'on' : 'off'
+    }
+    b.onclick = () => ctl.set(c.value > 0 ? 0 : 1)
+    show(c.value)
+    wrap.append(l, b)
+    ctl = {
+      id,
+      c,
+      sync: show,
+      set: (n) => {
+        n = Math.round(Math.min(c.max, Math.max(c.min, n)))
+        show(n)
+        onChange(n)
+      },
+    }
+  } else if (c.options) {
     const sel = document.createElement('select')
     sel.setAttribute('aria-label', c.label)
-    sel.style.gridColumn = '1 / span 2'
     c.options.forEach((name, i) => {
       const o = document.createElement('option')
       o.value = String(i)
@@ -245,21 +281,28 @@ function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: n
     inp.step = String(c.step)
     inp.value = String(c.value)
     inp.oninput = () => ctl.set(parseFloat(inp.value))
-    wrap.append(l, v, inp)
+    // a knob turns the same (visually hidden) input: focus, arrow keys and screen readers stay
+    const knob = opts.knob ? makeKnob(inp, opts.centre) : null
+    if (knob) {
+      wrap.classList.add('kn')
+      wrap.append(knob.el, inp, l, v)
+    } else wrap.append(l, v, inp)
+    const show = (n: number) => {
+      c.value = n
+      inp.value = String(n)
+      v.textContent = String(+n.toFixed(3))
+      paintRange(inp)
+      knob?.paint()
+    }
+    show(c.value)
     ctl = {
       id,
       c,
-      sync: (n) => {
-        c.value = n
-        inp.value = String(n)
-        v.textContent = String(+n.toFixed(3))
-      },
+      sync: show,
       set: (n) => {
         n = Math.min(c.max, Math.max(c.min, n))
         if (c.step >= 1) n = Math.round(n)
-        c.value = n
-        inp.value = String(n)
-        v.textContent = String(+n.toFixed(3))
+        show(n)
         onChange(n)
       },
     }
@@ -284,10 +327,11 @@ function toggleLearn(ctl: Ctl) {
     setInteract('learn cancelled')
     return
   }
-  document.querySelectorAll('.slider.learn').forEach((el) => el.classList.remove('learn'))
+  document.querySelectorAll('.learn').forEach((el) => el.classList.remove('learn'))
   learning = ctl
   ctl.wrap?.classList.add('learn')
   setInteract(`move a MIDI knob to map "${ctl.c.label}" (right-click again to cancel)`)
+  setStatus(`MIDI learn: move a knob or fader on your controller for "${ctl.c.label}" — right-click again or Esc cancels`)
 }
 
 function refreshCcTags() {
@@ -366,7 +410,6 @@ async function mountEngine(idx: number, id: string) {
     simple.engineMounted() // its saved values may predate a macro move
     syncReference()
     syncMaterial()
-    updateFrameInset()
     cameraLabel()
     $('blurb').textContent = e.blurb
     $('hudEngine').textContent = e.name
@@ -390,15 +433,22 @@ function renderEngineButtons() {
   host.innerHTML = ''
   ENGINE_META.forEach((m, i) => {
     const b = document.createElement('button')
-    b.innerHTML = `${i + 1} · ${m.name}<small>${m.id}</small>`
-    b.className = engine?.id === m.id ? 'active' : ''
+    b.type = 'button'
+    const name = document.createElement('span')
+    name.textContent = m.name
+    const k = document.createElement('kbd')
+    k.textContent = String(i + 1)
+    b.append(name, k)
+    b.title = `${m.name} — key ${i + 1}`
+    b.dataset.search = m.id
+    setPressed(b, engine?.id === m.id)
     b.onclick = () => void selectEngine(m.id)
     host.appendChild(b)
   })
 }
 
 /** Sections that start open the first time the panel is drawn. */
-const OPEN_BY_DEFAULT = new Set(['Growth', 'Species'])
+const OPEN_BY_DEFAULT = new Set(['Growth', 'Species', 'Settings']) // Settings: a simple engine's only group
 
 /** Wire a <details> so its open/closed state is remembered. */
 function rememberSection(det: HTMLDetailsElement, key: string, fallback: boolean) {
@@ -421,9 +471,11 @@ function renderEngineControls(e: Engine) {
     const existing = bodies.get(name)
     if (existing) return existing
     const det = document.createElement('details')
-    det.className = 'sec'
+    det.className = 'sec panel'
     const sum = document.createElement('summary')
-    sum.textContent = name
+    const title = document.createElement('b')
+    title.textContent = name
+    sum.appendChild(title)
     const body = document.createElement('div')
     body.className = 'body'
     det.append(sum, body)
@@ -433,7 +485,7 @@ function renderEngineControls(e: Engine) {
     const acts = (e.actions ?? []).filter((a) => a.group === name)
     if (acts.length) {
       const row = document.createElement('div')
-      row.className = 'row'
+      row.className = 'row acts'
       for (const a of acts) row.appendChild(actionButton(e, a))
       body.appendChild(row)
     }
@@ -454,31 +506,38 @@ function renderEngineControls(e: Engine) {
     if (c.icon) {
       let grid = grids.get(group)
       if (!grid) {
-        grid = document.createElement('div')
-        grid.className = 'icons'
-        parent.appendChild(grid)
-        grids.set(group, grid)
+        // mini LED keys in a grid (Code Painter's style keys), all / none above them
         const bar = document.createElement('div')
-        bar.className = 'row'
+        bar.className = 'minis'
         const all = document.createElement('button')
+        all.type = 'button'
         all.textContent = 'all'
         const none = document.createElement('button')
+        none.type = 'button'
         none.textContent = 'none'
         all.onclick = () => inBatch(e, () => Object.values(iconRefs).forEach((f) => f(1)))
         none.onclick = () => inBatch(e, () => Object.values(iconRefs).forEach((f) => f(0)))
         bar.append(all, none)
         parent.appendChild(bar)
+        grid = document.createElement('div')
+        grid.className = 'icons'
+        grid.setAttribute('role', 'group')
+        grid.setAttribute('aria-label', group)
+        parent.appendChild(grid)
+        grids.set(group, grid)
       }
       const b = document.createElement('button')
-      b.className = 'icon' + (c.value > 0 ? ' active' : '')
-      b.title = c.label
+      b.type = 'button'
+      b.className = 'icon'
+      b.title = `${c.icon} ${c.label}`
       b.dataset.search = c.key
-      b.setAttribute('aria-pressed', String(c.value > 0))
-      b.innerHTML = `<span>${c.icon}</span><small>${c.label}</small>`
+      const name = document.createElement('span')
+      name.textContent = c.label
+      b.appendChild(name)
+      setPressed(b, c.value > 0)
       const set = (n: number) => {
         c.value = n
-        b.classList.toggle('active', n > 0)
-        b.setAttribute('aria-pressed', String(n > 0))
+        setPressed(b, n > 0)
         apply(n)
       }
       b.onclick = () => set(c.value > 0 ? 0 : 1)
@@ -538,6 +597,7 @@ function renderEngineControls(e: Engine) {
 /** An engine's preset button: every value goes through its widget, so it applies, saves and shows at once. */
 function actionButton(e: Engine, a: EngineAction): HTMLButtonElement {
   const b = document.createElement('button')
+  b.type = 'button'
   b.textContent = a.label
   if (a.title) b.title = a.title
   b.dataset.search = a.label
@@ -615,9 +675,12 @@ function renderPresets() {
   host.innerHTML = ''
   presets.forEach((p, i) => {
     const b = document.createElement('button')
+    b.type = 'button'
     b.textContent = String(i + 1)
     b.title = p ? `${p.name} — click load, shift+click overwrite` : 'empty — shift+click to save here'
-    b.className = (p ? 'filled' : '') + (i === currentPreset ? ' current' : '')
+    b.setAttribute('aria-label', `slot ${i + 1}${p ? `: ${p.name}` : ', empty'}${i === currentPreset ? ', loaded' : ''}`)
+    // LED: violet = something saved here, green = the slot loaded
+    b.className = (p ? 'full' : '') + (i === currentPreset ? ' on' : '')
     b.onclick = (e) => (e.shiftKey ? savePreset(i) : void loadPreset(i))
     host.appendChild(b)
   })
@@ -672,6 +735,7 @@ function savePreset(i: number) {
   currentPreset = i
   renderPresets()
   $('presetStatus').textContent = stored ? `saved slot ${i + 1}` : `slot ${i + 1} kept for this session only — browser storage is unavailable`
+  toast(stored ? `preset slot ${i + 1} saved` : `slot ${i + 1}: this session only`, stored ? 'ok' : 'err')
   if (!stored) $('storageNote').hidden = false
 }
 
@@ -747,6 +811,8 @@ midi.onCC = (cc, value) => {
     save()
     learning.wrap?.classList.remove('learn')
     setInteract(`cc${cc} → ${learning.c.label}`)
+    setStatus(`MIDI cc${cc} → ${learning.c.label}`)
+    toast(`cc${cc} → ${learning.c.label}`)
     learning = null
     refreshCcTags()
     return
@@ -771,7 +837,10 @@ midi.onStatus = (s) => {
 audio.onStatus = (s) => {
   if (mode !== 'midi') setStatus(s)
 }
+/** connected MIDI inputs (the top bar's midi light) */
+let midiDevices = 0
 midi.onDevices = (devs) => {
+  midiDevices = devs.length
   const sel = $<HTMLSelectElement>('midiDevice')
   const cur = sel.value
   sel.innerHTML = '<option value="all">all MIDI inputs</option>'
@@ -788,10 +857,10 @@ $<HTMLSelectElement>('midiDevice').onchange = (e) => midi.select((e.target as HT
 function setMode(m: Mode) {
   mode = m
   clock.allOff()
-  $('modeMidi').className = m === 'midi' ? 'active' : ''
-  $('modeFile').className = m === 'file' ? 'active' : ''
-  $('modeMic').className = m === 'mic' ? 'active' : ''
-  $('modeTab').className = m === 'tab' ? 'active' : ''
+  setPressed($('modeMidi'), m === 'midi')
+  setPressed($('modeFile'), m === 'file')
+  setPressed($('modeMic'), m === 'mic')
+  setPressed($('modeTab'), m === 'tab')
   $('micRow').hidden = m !== 'mic'
   $('midiRow').hidden = m !== 'midi'
   $('fileRow').hidden = m !== 'file'
@@ -818,7 +887,7 @@ function setMode(m: Mode) {
 $('modeMidi').onclick = () => setMode('midi')
 $('stems').onclick = () => {
   audio.stems = !audio.stems
-  $('stems').className = audio.stems ? 'active' : ''
+  setPressed($('stems'), audio.stems)
   setStatus(audio.stems ? 'stems on — drums / bass / voice / other each grow their own species (see Organism stem selects)' : 'stems off')
 }
 const textIn = $<HTMLInputElement>('textIn')
@@ -977,6 +1046,7 @@ function syncReference() {
     inp.max = String(c.c.max)
     inp.step = String(c.c.step)
     inp.value = String(c.c.value)
+    paintRange(inp)
     $(`${id}Value`).textContent = String(+c.c.value.toFixed(3))
   }
   $<HTMLButtonElement>('refFit').disabled = !organism
@@ -1080,9 +1150,11 @@ function renderPlaylist() {
   host.hidden = false
   audio.playlist.forEach((f, i) => {
     const b = document.createElement('button')
+    b.type = 'button'
     b.textContent = `${i + 1}. ${f.name}`
     b.title = f.name
-    b.className = i === audio.trackI ? 'active' : ''
+    b.className = i === audio.trackI ? 'on' : ''
+    if (i === audio.trackI) b.setAttribute('aria-current', 'true')
     b.onclick = () => void audio.loadTrack(i)
     host.appendChild(b)
   })
@@ -1093,7 +1165,10 @@ const fmtT = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).
 function updateTransport() {
   if (mode !== 'file' || !audio.duration) return
   $('playBtn').textContent = audio.playing ? '❚❚' : '▶'
-  if (!seeking) seekEl.value = String(Math.round((audio.currentTime / audio.duration) * 1000))
+  if (!seeking) {
+    seekEl.value = String(Math.round((audio.currentTime / audio.duration) * 1000))
+    paintRange(seekEl)
+  }
   const n = audio.playlist.length
   $('timeLbl').textContent = `${fmtT(audio.currentTime)} / ${fmtT(audio.duration)}${n > 1 ? ` · ${audio.trackI + 1}/${n}` : ''}`
 }
@@ -1166,7 +1241,11 @@ async function takeStill(scale: 1 | 2) {
       const name = `growth-${stamp()}${scale === 2 ? '-2x' : ''}.png`
       download(blob, name)
       setStatus(`saved ${name} (${(blob.size / 1e6).toFixed(1)} MB)`)
-    } else setStatus('snapshot failed')
+      toast(`still saved · ${name}`)
+    } else {
+      setStatus('snapshot failed')
+      toast('snapshot failed', 'err')
+    }
     return
   }
   stillPending = true // engines without their own snapshot: grab after the next frame
@@ -1177,17 +1256,26 @@ function cameraCtl() {
   return engine ? ctls.get(`e:${engine.id}:camMode`) : undefined
 }
 const cameraName = (c: Ctl) => c.c.options?.[c.c.value] ?? String(c.c.value)
+let shownCamera = ''
 function cameraLabel() {
   const c = cameraCtl()
   const b = $('camCycle')
   b.hidden = !c
-  if (c) b.textContent = `🎥 ${cameraName(c)}`
+  if (c) {
+    const name = cameraName(c)
+    if (name !== shownCamera) {
+      shownCamera = name
+      b.textContent = name.replace(/ \(.*\)$/, '') // "flight (through the growth)" → flight; the title has it all
+      b.title = `camera: ${name} — C next style · Shift+C previous`
+      b.setAttribute('aria-label', `Camera: ${name}. Next camera style`)
+    }
+  }
   // the lock is UI: it lives in the panel, so it is never in a capture or over "Show controls"
   const lock = $('camLock')
   lock.hidden = !engine?.toggleCameraLock
   const on = !!engine?.cameraLocked
-  lock.textContent = on ? '🔒 locked' : '🔓 lock'
-  lock.setAttribute('aria-pressed', String(on))
+  lock.textContent = on ? 'locked' : 'lock'
+  setPressed(lock, on)
   lock.title = on ? 'V — unlock: the camera moves again' : 'V — freeze this view (Reset keeps it)'
   simple.sync() // camera style and source buttons read the same controls
 }
@@ -1208,6 +1296,14 @@ function toggleCameraLock() {
 $('camCycle').onclick = () => cycleCamera()
 $('camLock').onclick = toggleCameraLock
 $('still').onclick = (e) => void takeStill(e.shiftKey ? 2 : 1)
+$('stillKey').onclick = (e) => void takeStill(e.shiftKey ? 2 : 1)
+// easy's Export step: the whole Output panel is in the console
+$('moreOutput').onclick = () => {
+  if (settings.uiMode !== 'advanced') $('uiTier').click()
+  const out = $<HTMLDetailsElement>('sec-output')
+  out.open = true
+  out.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
 
 $<HTMLInputElement>('castUrl').value = settings.castUrl
 $<HTMLInputElement>('castUrl').onchange = (e) => {
@@ -1254,24 +1350,24 @@ $('cast').onclick = () => {
   }
 }
 sound.enabled = settings.soundBack
-$('soundBack').className = sound.enabled ? 'active' : ''
+setPressed($('soundBack'), sound.enabled)
 $('soundBack').onclick = () => {
   sound.enabled = settings.soundBack = !sound.enabled
   save()
-  $('soundBack').className = sound.enabled ? 'active' : ''
+  setPressed($('soundBack'), sound.enabled)
   setInteract(sound.enabled ? 'sound-back on — fuses, bursts and spawns play a pluck' : 'sound-back off')
 }
 $('gestures').onclick = async () => {
   if (gestures.running) {
     gestures.stop()
     engine?.setGesture?.(null)
-    $('gestures').className = ''
+    setPressed($('gestures'), false)
     setInteract('gestures off')
     return
   }
-  $('gestures').className = 'active'
+  setPressed($('gestures'), true)
   await gestures.start(setInteract)
-  if (!gestures.running) $('gestures').className = ''
+  if (!gestures.running) setPressed($('gestures'), false)
 }
 
 // ---------------------------------------------------------------- performance mode
@@ -1295,8 +1391,6 @@ function setUiHidden(h: boolean) {
   // inert: Tab cannot wander into invisible controls, and they cannot eat keys
   panel.inert = h
   document.body.classList.toggle('hide-ui', h)
-  $('hideUi').textContent = h ? 'show UI' : 'hide UI'
-  updateFrameInset()
   if (!h) {
     // keyboard users get their place back (or the hide button when they came from "Show controls")
     const back = focusBeforeHide ?? (active?.id === 'returnUi' && focusedByKeyboard(active) ? $('hideUi') : null)
@@ -1307,22 +1401,10 @@ function setUiHidden(h: boolean) {
 }
 $('returnUi').onclick = () => setUiHidden(false)
 
-/**
- * The panel covers part of the stage: the engine centres its framing in the rest. Nothing while
- * the UI is hidden (F2, performance, a ?ui=0 capture); the engine also ignores it during a take.
- */
-function updateFrameInset() {
-  const e = engine
-  if (!e?.setFrameInset) return
-  if (uiHidden()) return e.setFrameInset(0, 0)
-  const r = $('panel').getBoundingClientRect()
-  const w = window.innerWidth
-  const h = window.innerHeight
-  // a side panel covers the left; on a phone it spans the width and covers the top
-  if (r.width < w * 0.6) e.setFrameInset(Math.min(0.45, Math.max(0, r.right / w)), 0)
-  else e.setFrameInset(0, Math.min(0.5, Math.max(0, r.bottom / h)))
-}
-new ResizeObserver(updateFrameInset).observe($('panel'))
+// The stage is its own cell (no panel covers it), so the engine never needs a frame inset now
+// (Engine.setFrameInset stays for an overlay layout). It does need to hear when the cell resizes
+// without the window: easy ↔ console, hide UI, a search opening the console column.
+new ResizeObserver(() => engine?.resize()).observe(stage)
 async function performanceMode() {
   setUiHidden(true)
   try {
@@ -1336,6 +1418,20 @@ document.addEventListener('fullscreenchange', () => {
 })
 $('perf').onclick = () => void performanceMode()
 $('hideUi').onclick = () => setUiHidden(!uiHidden())
+// full screen with the controls (perform is full screen without them)
+$('fullBtn').onclick = async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen()
+    else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+  } catch {
+    setStatus('full screen was refused by the browser')
+  }
+}
+$('themeBtn').onclick = () => {
+  settings.theme = settings.theme === 'light' ? 'dark' : 'light'
+  applyTheme(settings.theme)
+  save()
+}
 
 /** Reset the pattern but keep growing for notes still held (as the same notes: no new attack). */
 function resetEngine() {
@@ -1350,6 +1446,7 @@ function cancelLearn() {
   learning.wrap?.classList.remove('learn')
   learning = null
   setInteract('learn cancelled')
+  setStatus('MIDI learn cancelled')
 }
 
 // One keydown handler for the shortcuts and the piano, so the order is explicit:
@@ -1503,8 +1600,21 @@ function loop() {
     const st = engine?.stats?.() ?? ''
     cameraLabel() // presets, random mix and MIDI can all move it
     $('hudRec').textContent = rec.hud() + (st ? ` · ${st}` : '')
+    $('hudRec').classList.toggle('live', rec.busy()) // red only while a take is on
     updateTransport()
+    statusLights(m)
   }
+}
+
+/** The top bar's lights: midi (a device or a held note), audio (live input), rec (red; violet while armed). */
+const lights = { midi: $('ledMidi'), audio: $('ledAudio'), rec: $('ledRec') }
+function statusLights(m: { active: ReadonlyMap<unknown, { source: NoteSource }> }) {
+  const played = [...m.active.values()].some((n) => playsInstrument(n.source))
+  lights.midi.classList.toggle('on', mode === 'midi' && (midiDevices > 0 || played))
+  lights.audio.classList.toggle('on', mode !== 'midi' && audio.active && (audio.source !== 'file' || audio.playing))
+  const take = rec.state()
+  lights.rec.classList.toggle('on', take === 'starting' || take === 'recording' || take === 'stopping')
+  lights.rec.classList.toggle('armed', take === 'armed' || take === 'counting')
 }
 
 // ---------------------------------------------------------------- url params (capture-friendly launch)
@@ -1540,10 +1650,8 @@ async function applyParams() {
 }
 
 // ---------------------------------------------------------------- boot
-window.addEventListener('resize', () => {
-  engine?.resize()
-  updateFrameInset()
-})
+window.addEventListener('resize', () => engine?.resize())
+setupTheme(settings.theme) // set before the first paint (index.html); this bakes the case's dot grid
 document.getElementById('ver')!.textContent = 'v' + VERSION
 document.getElementById('hudVer')!.textContent = 'v' + VERSION
 document.title = `Growth v${VERSION} — MIDI / music visualiser`
@@ -1571,6 +1679,7 @@ renderEngineButtons()
 renderPresets()
 setMode('midi')
 if (params.get('ui') === '0') setUiHidden(true) // before the engine mounts, so the panel never flashes in a capture
+delete document.documentElement.dataset.capture // index.html's first-paint guard: body.hide-ui has taken over
 void midi.start()
 // first run: the Roots look once the engine is up — never over a capture URL or settings someone made
 const launchParams = ['engine', 'preset', 'cam', 'ui'].some((k) => params.has(k))
@@ -1578,6 +1687,7 @@ void selectEngine(ENGINE_META.some((e) => e.id === settings.engine) ? settings.e
   .then(applyParams)
   .then(() => simple.firstRun(launchParams || !organismUntouched || engine?.id !== 'organism'))
 piano.enabled = true
+paintRangesOnInput() // the faders' green fill: every drag repaints, and the static ones start right
 // debug handle (console): window.__viz.clock.state, window.__viz.audio.features, window.__viz.engine
 ;(window as unknown as { __viz: unknown }).__viz = {
   clock,

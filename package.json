@@ -1,7 +1,7 @@
 {
   "name": "growth-midi-visualiser",
   "private": true,
-  "version": "0.22.1",
+  "version": "0.23.0",
   "description": "Growth — MIDI / music visualiser: a black 3D space where notes grow organisms",
   "type": "module",
   "packageManager": "yarn@1.22.22",

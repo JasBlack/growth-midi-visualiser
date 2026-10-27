@@ -1,6 +1,6 @@
-// Simple mode: the Macros row (Reaction, Energy, Complexity, Motion, Chaos), the "Make something"
-// card (the looks, Surprise me, camera style, draw-a-source intents) and the Simple / Advanced
-// tier switch. The Macros row sits above the card and shows in both tiers.
+// Easy mode's steps: Look (the look tiles, Surprise me), Response (the five macro knobs:
+// Reaction, Energy, Complexity, Motion, Chaos), Camera (style keys) and Draw a source (intents),
+// plus the easy / console tier switch (Simple / Advanced). The steps show in both tiers.
 //
 // Every widget here is a view of the control registry (e:organism:*, g:*, m:*): values go
 // through the same Ctl.set as the Advanced sliders, so presets, MIDI learn, search and saved
@@ -13,6 +13,8 @@ import { PALETTES } from './color'
 import { CAM, CAM_MODES } from './engines/organism/camera'
 import { FRAMED_SPEED, LOOKS, LOOK_GLOBALS, lookCamera, pickSurprise, resolveLook } from './looks'
 import { MACROS, MacroRig, NEUTRAL, type MacroPositions } from './macros'
+import { setPressed } from './ui/dom'
+import { lookThumb } from './ui/lookTiles'
 
 export type UiTier = 'simple' | 'advanced'
 
@@ -31,6 +33,14 @@ export interface SimpleSettings {
   freshCanvas: boolean
 }
 
+/** How a registry widget is drawn (main.ts widget()). */
+export interface WidgetOpts {
+  /** a rotary knob (the macros) instead of a fader */
+  knob?: boolean
+  /** a knob's neutral position 0..1: its ring lights from there to the value */
+  centre?: number
+}
+
 export interface CtlLike {
   readonly c: EngineControl
   set(n: number): void
@@ -44,8 +54,8 @@ export interface SimpleHost {
   setStatus(s: string): void
   /** a registry entry: g:<key>, e:<engine>:<key>, m:<macro> */
   ctl(id: string): CtlLike | undefined
-  /** a registry slider (MIDI-learnable, searchable) in `host` */
-  slider(host: HTMLElement, id: string, c: EngineControl, onChange: (v: number) => void): CtlLike
+  /** a registry slider or knob (MIDI-learnable, searchable) in `host` */
+  slider(host: HTMLElement, id: string, c: EngineControl, onChange: (v: number) => void, opts?: WidgetOpts): CtlLike
   engine(): Engine | null
   /** the Organism, mounted (waits for a mount in flight); null when it cannot be */
   organism(): Promise<Engine | null>
@@ -95,16 +105,21 @@ export function setupSimple(host: SimpleHost) {
   /** trace / relief chosen before a source existed: applied when one opens */
   let pendingIntent: Intent | null = null
 
-  // ------------------------------------------------------------ tier
+  // ------------------------------------------------------------ tier: easy | console
   const tierBtn = $<HTMLButtonElement>('uiTier')
+  const easyBtn = $<HTMLButtonElement>('tierEasy')
   function setTier(t: UiTier) {
     s.uiMode = t
     document.documentElement.dataset.ui = t
-    tierBtn.setAttribute('aria-pressed', String(t === 'advanced'))
-    tierBtn.title = t === 'advanced' ? 'showing every setting — click for the simple panel' : 'show every setting'
+    setPressed(tierBtn, t === 'advanced')
+    setPressed(easyBtn, t === 'simple')
   }
   tierBtn.onclick = () => {
-    setTier(s.uiMode === 'advanced' ? 'simple' : 'advanced')
+    setTier('advanced')
+    host.save()
+  }
+  easyBtn.onclick = () => {
+    setTier('simple')
     host.save()
   }
   setTier(s.uiMode)
@@ -112,9 +127,15 @@ export function setupSimple(host: SimpleHost) {
   // ------------------------------------------------------------ looks
   const lookHost = $('looks')
   const lookBtns = LOOKS.map((r) => {
+    // a tile: the look's own drawing and a caption
     const b = document.createElement('button')
     b.type = 'button'
-    b.textContent = r.label
+    b.className = 'tile'
+    const name = document.createElement('span')
+    name.className = 'nm'
+    name.textContent = r.label.replace(/[()]/g, '') // "Webs (night)" → "Webs night": fits the tile
+    b.append(lookThumb(r.id), name)
+    b.title = r.label
     b.dataset.look = r.id
     b.setAttribute('aria-pressed', 'false')
     b.onclick = () => void applyLook(r.id)
@@ -184,9 +205,9 @@ export function setupSimple(host: SimpleHost) {
   const macroHost = $('macros')
   for (const m of MACROS) {
     const c: EngineControl = { key: `macro ${m.id}`, label: m.label, min: 0, max: 1, step: 0.01, value: s.macros[m.id] }
-    const w = host.slider(macroHost, `m:${m.id}`, c, (n) => rig.set(m.id, n))
+    const w = host.slider(macroHost, `m:${m.id}`, c, (n) => rig.set(m.id, n), { knob: true, centre: NEUTRAL })
     if (w.wrap) {
-      w.wrap.title = `${m.title}. 0.5 = the look's own · double-click: back to 0.5 · right-click: MIDI learn`
+      w.wrap.title = `${m.title}. 0.5 = the look's own · drag or wheel (Shift: fine) · double-click: back to 0.5 · right-click: MIDI learn`
       w.wrap.ondblclick = () => w.set(NEUTRAL)
     }
   }
@@ -195,9 +216,9 @@ export function setupSimple(host: SimpleHost) {
     for (const m of MACROS) host.ctl(`m:${m.id}`)?.sync?.(s.macros[m.id])
   }
 
-  // ------------------------------------------------------------ camera style
-  const camSel = $<HTMLSelectElement>('camStyle')
-  const camOther = camSel.querySelector<HTMLOptionElement>('option[value=other]')!
+  // ------------------------------------------------------------ camera style: keys with LEDs
+  const camKeys = [...$('camStyle').querySelectorAll<HTMLButtonElement>('button[data-cam]')]
+  const camOther = $('camOther')
   function camStyle(): CamStyle {
     const e = host.engine()
     if (!e || e.id !== 'organism') return 'other'
@@ -210,8 +231,7 @@ export function setupSimple(host: SimpleHost) {
     if (mode === CAM.orbit && speed === 0) return 'manual'
     return 'other'
   }
-  camSel.onchange = async () => {
-    const want = camSel.value as CamStyle
+  async function chooseCamera(want: CamStyle) {
     const e = await host.organism()
     if (!e) return
     if (want === 'still') {
@@ -239,6 +259,7 @@ export function setupSimple(host: SimpleHost) {
     }
     host.cameraChanged()
   }
+  for (const b of camKeys) b.onclick = () => void chooseCamera(b.dataset.cam as CamStyle)
 
   // ------------------------------------------------------------ draw a source
   const intentBtns: Record<Intent, HTMLButtonElement> = { trace: $('srcTrace'), relief: $('srcRelief'), model: $('srcModel'), off: $('srcOff') }
@@ -261,7 +282,7 @@ export function setupSimple(host: SimpleHost) {
     pendingIntent = null
     if ((intent === 'trace' || intent === 'relief') && !host.source.active()) {
       pendingIntent = intent
-      host.setStatus('Choose a picture — or start a video or camera in Input below')
+      host.setStatus('Choose a picture — or start a video or camera in step 1, Source')
       host.source.pickPicture()
       return
     }
@@ -296,11 +317,12 @@ export function setupSimple(host: SimpleHost) {
     const style = camStyle()
     if (style !== shownCam) {
       shownCam = style
+      camOther.hidden = style !== 'other'
       if (style === 'other') {
         const mode = host.ctl(org('camMode'))?.c.value ?? -1
-        camOther.textContent = host.engine()?.id === 'organism' ? `${CAM_MODES[mode] ?? 'camera'} (set in Advanced)` : '— (Organism only)'
+        camOther.textContent = host.engine()?.id === 'organism' ? `now: ${CAM_MODES[mode] ?? 'camera'} (set in the console)` : 'camera styles: Organism only'
       }
-      camSel.value = style
+      for (const b of camKeys) setPressed(b, b.dataset.cam === style)
     }
     const intent = currentIntent()
     if (intent !== shownIntent) {
