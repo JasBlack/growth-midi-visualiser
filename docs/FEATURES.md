@@ -7,6 +7,12 @@ growths bind into one structure. Feed it MIDI, an audio file or a microphone.
 
 Vite + TypeScript + three (WebGPU, WebGL2 fallback). No backend.
 
+## v0.23.2 — an icon and a link preview
+
+Growth now has its own icon in browser tabs, bookmarks and on phone home
+screens, and links to growth.jas.black show a preview card (a grown organism
+and the GROWTH wordmark) when pasted into chats and social posts.
+
 ## v0.23.1 — no camera punch by default
 
 The camera no longer punches in on every hit. **kick** (React group in the
