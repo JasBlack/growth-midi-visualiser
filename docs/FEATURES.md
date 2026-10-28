@@ -7,6 +7,14 @@ growths bind into one structure. Feed it MIDI, an audio file or a microphone.
 
 Vite + TypeScript + three (WebGPU, WebGL2 fallback). No backend.
 
+## v0.24.1 — the keys make a sound
+
+Playing now sounds by default (the **keys** instrument, an electric piano), on
+the on-screen keyboard, the computer keyboard and MIDI alike. The speaker key at
+the left of the keyboard mutes it and brings back the last instrument; console →
+**Play → instrument** picks another sound. On iPhone the first tap already sounds,
+also with the ringer switch on silent.
+
 ## v0.24.0 — an on-screen keyboard, and phones
 
 - **A keyboard under the stage**, playable with a mouse or fingers: several

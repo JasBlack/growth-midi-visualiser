@@ -30,6 +30,8 @@ export class PianoKeys {
     private host: HTMLElement,
     private clock: MusicClock,
     private piano: KeyboardPiano,
+    /** inside the gesture: let the instrument start (iOS creates / resumes audio only here) */
+    private onGesture: () => void = () => {},
   ) {
     host.addEventListener('pointerdown', this.onDown)
     host.addEventListener('pointermove', this.onMove)
@@ -119,6 +121,7 @@ export class PianoKeys {
     const h = this.hit(e.clientX, e.clientY)
     if (!h) return
     e.preventDefault()
+    this.onGesture()
     this.host.setPointerCapture(e.pointerId)
     this.down.set(e.pointerId, h.pitch)
     this.on(h.pitch, h.velocity)
@@ -137,6 +140,7 @@ export class PianoKeys {
   private onUp = (e: PointerEvent) => {
     const was = this.down.get(e.pointerId)
     if (was === undefined) return
+    this.onGesture()
     this.down.delete(e.pointerId)
     this.release(was)
   }

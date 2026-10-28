@@ -361,6 +361,9 @@
       .pianobar { flex: none; display: flex; gap: 6px; height: 58px; }
       body.no-piano #pianoBar { display: none !important; }
       .pianobar .key.ico { height: auto; width: 30px; min-width: 30px; padding: 0; font-size: 15px; }
+      .pianobar .key.snd { padding-top: 8px; }
+      .key.snd[aria-pressed='true'] .mute, .key.snd[aria-pressed='false'] .wave { display: none; }
+      .key.snd[aria-pressed='false'] { color: var(--muted); }
       .pkeys {
         position: relative; flex: 1; min-width: 0; display: flex; gap: 1px; overflow: hidden; cursor: pointer;
         border-radius: 9px; border: 1px solid var(--keyline); background: var(--keyshadow); box-shadow: 0 2px 0 var(--keyshadow);
@@ -767,6 +770,7 @@
         </div>
         <!-- the on-screen keyboard (ui/pianoKeys.ts): finger, mouse, several at once; the octave keys = Z / X -->
         <div id="pianoBar" class="pianobar">
+          <button id="pianoSound" class="key ico snd" type="button" aria-pressed="true" aria-label="Sound"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path class="wave" d="M11 5.5c1.2 1.4 1.2 3.6 0 5M12.8 3.8c2.1 2.4 2.1 6 0 8.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path class="mute" d="M11 6l4 4M15 6l-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
           <button id="pianoDown" class="key ico" type="button" title="octave down (Z)" aria-label="Octave down">‹</button>
           <div id="pianoKeys" class="pkeys" role="group" aria-label="On-screen keyboard"></div>
           <button id="pianoUp" class="key ico" type="button" title="octave up (X)" aria-label="Octave up">›</button>

@@ -43,8 +43,23 @@ export function audioContext(): AudioContext {
     }
     window.addEventListener('pointerdown', kick)
     window.addEventListener('keydown', kick)
+    // iOS only counts the end of a touch as a gesture that may start sound
+    window.addEventListener('pointerup', kick)
+    window.addEventListener('touchend', kick)
   }
   return ctx
+}
+
+/**
+ * Call from inside a gesture that is about to make sound (a tap on the on-screen keys): the
+ * context is created or resumed there, as iOS requires, and Safari's audio session is set to
+ * playback so the notes sound with the ringer switch on silent.
+ */
+export function unlockAudio() {
+  const c = audioContext()
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+  if (session && session.type === 'auto') session.type = 'playback'
+  if (c.state !== 'running') void c.resume()
 }
 
 /** Send a node to the speakers and to the full-mix recording bus. */
