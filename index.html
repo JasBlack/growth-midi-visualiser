@@ -357,6 +357,22 @@
       @container (max-width: 600px) { #hud { display: none; } }
       @media (max-width: 1180px) { .status { display: none; } }
 
+      /* ───────────── on-screen keyboard: light keys like a real one, green while held (by any source) ───────────── */
+      .pianobar { flex: none; display: flex; gap: 6px; height: 58px; }
+      body.no-piano #pianoBar { display: none !important; }
+      .pianobar .key.ico { height: auto; width: 30px; min-width: 30px; padding: 0; font-size: 15px; }
+      .pkeys {
+        position: relative; flex: 1; min-width: 0; display: flex; gap: 1px; overflow: hidden; cursor: pointer;
+        border-radius: 9px; border: 1px solid var(--keyline); background: var(--keyshadow); box-shadow: 0 2px 0 var(--keyshadow);
+        touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+      }
+      .pk.w { position: relative; flex: 1 1 0; min-width: 0; background: #deded9; }
+      .pk.w[data-c]::after { content: attr(data-c); position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font: 500 8px/1 var(--mono); letter-spacing: .05em; color: #77776f; pointer-events: none; }
+      .pk.b { position: absolute; top: 0; height: 58%; transform: translateX(-50%); z-index: 1; background: #1c1d20; border: 1px solid #070708; border-top: 0; border-radius: 0 0 4px 4px; }
+      .pk.w.on { background: var(--accent); }
+      .pk.w.on[data-c]::after { color: #0b0b0c; }
+      .pk.b.on { background: color-mix(in srgb, var(--accent) 70%, #000); box-shadow: var(--glow-g); }
+
       /* ───────────── floating furniture ───────────── */
       /* anything floating over the stage: tag it .ui-overlay and it hides with the UI and in capture output */
       body.hide-ui .ui-overlay, body.capture-output .ui-overlay { display: none !important; }
@@ -393,6 +409,10 @@
       html[data-capture] #topbar, html[data-capture] .col, html[data-capture] #centre > :not(.well) { display: none !important; }
       body.hide-ui .well, html[data-capture] .well { border: 0; border-radius: 0; flex: 1; aspect-ratio: auto; }
       body.hide-ui .well::after, html[data-capture] .well::after { display: none; }
+      /* on a phone or tablet the keyboard is how you play: it stays under a full-screen stage (never in a ?ui=0 capture) */
+      @media (hover: none) and (pointer: coarse) {
+        html:not([data-capture]) body.hide-ui:not(.capture-output):not(.no-piano) #centre > #pianoBar { display: flex !important; height: 70px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
+      }
 
       /* mid-size console: the two columns stack beside the stage */
       @media (max-width: 1099px) and (min-width: 900px) {
@@ -415,6 +435,11 @@
         .status { display: none; }
         body:not(.hide-ui) #centre { position: sticky; top: 0; z-index: 4; background: var(--case); padding: 4px 0 6px; margin: -4px 0 0; }
         body:not(.hide-ui) .well { flex: none; aspect-ratio: 16 / 9; }
+        .pianobar { height: 76px; }
+        /* a phone on its side: the pinned stage, the keyboard and the status line all fit the screen */
+        body:not(.hide-ui) .well { max-height: calc(100vh - 140px); max-height: calc(100svh - 140px); min-height: 150px; }
+        body.no-piano:not(.hide-ui) .well { max-height: calc(100svh - 60px); }
+        .pk.w[data-c]::after { font-size: 9px; bottom: 6px; }
         .hints { display: none; }
         #hud { display: none; }
         .col { overflow: visible; margin: 0; padding: 0; }
@@ -487,6 +512,7 @@
               </div>
               <div class="row" id="midiRow">
                 <select id="midiDevice" class="grow" aria-label="MIDI input"><option value="all">all MIDI inputs</option></select>
+                <button id="pianoToggle" class="key" type="button" aria-pressed="true" title="the on-screen keyboard under the stage">keys</button>
               </div>
               <div class="row" id="micRow" hidden>
                 <select id="micDevice" class="grow" aria-label="Microphone input"><option value="">default input</option></select>
@@ -738,6 +764,12 @@
         <div class="well" id="well">
           <div id="stage"></div>
           <div id="countdown" hidden></div>
+        </div>
+        <!-- the on-screen keyboard (ui/pianoKeys.ts): finger, mouse, several at once; the octave keys = Z / X -->
+        <div id="pianoBar" class="pianobar">
+          <button id="pianoDown" class="key ico" type="button" title="octave down (Z)" aria-label="Octave down">‹</button>
+          <div id="pianoKeys" class="pkeys" role="group" aria-label="On-screen keyboard"></div>
+          <button id="pianoUp" class="key ico" type="button" title="octave up (X)" aria-label="Octave up">›</button>
         </div>
         <div class="lcdrow">
           <div id="status" class="lcd" role="status">…</div>
