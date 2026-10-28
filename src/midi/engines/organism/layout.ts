@@ -57,12 +57,12 @@ export class PitchLayout implements OrganismFeature {
   readonly controls: FeatureControl[] = [
     { key: 'layout', label: 'pitch layout: where a note roots', min: 0, max: LAYOUTS.length - 1, step: 1, value: LAYOUT.off, options: LAYOUTS, group: G },
     { key: 'layoutSpread', label: 'pitch layout: spread (how far apart the registers sit)', min: 0.3, max: 2.5, step: 0.05, value: 1, group: G },
-    { key: 'harmony', label: 'harmony: chord tones root together and fuse, dissonant notes keep apart (0 = off)', min: 0, max: 1, step: 0.05, value: 0.6, group: G },
+    { key: 'harmony', label: 'harmony: chord tones root together and fuse, dissonant notes keep apart (0 = off)', min: 0, max: 1, step: 0.05, value: 0.3, group: G },
     { key: 'velocityLook', label: 'velocity: strong notes thick and hot, soft ones thin and dim (0 = thickness only)', min: 0, max: 2, step: 0.05, value: 1, group: G },
   ]
   mode = 0
   spread = 1
-  harmony = 0.6
+  harmony = 0.3
   private vel = 1
   /**
    * Squared-distance factor per interval class for the tips' reach (engine nearestEndpoint): below 1

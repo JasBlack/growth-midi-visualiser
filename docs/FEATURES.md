@@ -7,6 +7,19 @@ growths bind into one structure. Feed it MIDI, an audio file or a microphone.
 
 Vite + TypeScript + three (WebGPU, WebGL2 fallback). No backend.
 
+## v0.24.2 — smaller rings, growths spread out
+
+- **Smaller shock rings:** the rings of light that spread from a note's flare are
+  half as wide by default. New control **ignition: shock ring size** (console →
+  Notes, or search "ring"); **ignition: shock ring** next to it sets how often and
+  how bright they are (0 = off).
+- **Growths spread out** instead of piling up in the middle: **cohesion** 0.35 → 0.1
+  (fewer notes graft onto existing growth) and **harmony** 0.6 → 0.3 (chords root
+  less tightly together). Measured with chord bursts like an audio file's onsets:
+  roots sit about 25% further apart and half as many overlap. Both are still in
+  console → Growth if you want the denser, fused look back. Browsers that saved
+  the old defaults get the new ones once; values you set yourself are kept.
+
 ## v0.24.1 — the keys make a sound
 
 Playing now sounds by default (the **keys** instrument, an electric piano), on
