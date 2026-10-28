@@ -96,6 +96,8 @@ interface Settings extends SimpleSettings {
   pianoKeys: boolean
   /** the v0.24.1 switch to a sounding instrument by default has run in this browser */
   keysSound: boolean
+  /** the v0.24.2 spread-out defaults have been applied in this browser */
+  spreadOut: boolean
 }
 const LS = 'midiviz_settings_v3'
 const settings: Settings = {
@@ -130,6 +132,7 @@ const settings: Settings = {
   kickOff: false,
   pianoKeys: true,
   keysSound: false,
+  spreadOut: false,
 }
 /** Nobody has tuned the Organism in this browser yet: the first-run look may set it up. */
 let organismUntouched = true
@@ -169,6 +172,16 @@ let organismUntouched = true
     if (org && 'kick' in org) org.kick = 0
     if ('e:organism:kick' in settings.macroBase) settings.macroBase['e:organism:kick'] = 0
     settings.kickOff = true
+  }
+  // v0.24.2: growths spread out (cohesion .35 → .1, harmony .6 → .3); browsers that saved the
+  // old defaults get the new ones once, a value the user chose is kept
+  if (settings.spreadOut !== true) {
+    const org = settings.engineCtl?.organism
+    for (const [key, was, now] of [['cohesion', 0.35, 0.1], ['harmony', 0.6, 0.3]] as const) {
+      if (org && org[key] === was) org[key] = now
+      if (settings.macroBase[`e:organism:${key}`] === was) settings.macroBase[`e:organism:${key}`] = now
+    }
+    settings.spreadOut = true
   }
 }
 audio.sensitivity = settings.audioSens

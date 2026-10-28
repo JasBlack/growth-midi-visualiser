@@ -360,7 +360,7 @@ export class OrganismEngine implements Engine, OrganismHost {
   controls: EngineControl[] = [
     { key: 'species', label: 'species choice (from the toggled shapes below)', min: 0, max: SPECIES_MODES.length - 1, step: 1, value: 2, options: SPECIES_MODES },
     ...SPECIES.map((sp, i) => ({ key: `sp:${i}`, label: sp.name, icon: sp.icon, min: 0, max: 1, step: 1, value: sp.soft || sp.optIn ? 0 : 1 })),
-    { key: 'cohesion', label: 'cohesion (spawn near / graft onto / pull together)', min: 0, max: 1, step: 0.02, value: 0.35 },
+    { key: 'cohesion', label: 'cohesion (spawn near / graft onto / pull together)', min: 0, max: 1, step: 0.02, value: 0.1 },
     { key: 'bounds', label: 'bounds when there is no shell', min: 0, max: 1, step: 1, value: 0, options: ['sphere of the organism size', 'none — grow forever'] },
     { key: 'size', label: 'organism size (the sphere above, and where growth is pulled back)', min: 4, max: 60, step: 1, value: 14 },
     { key: 'shell', label: 'shell', min: 0, max: BASE_SHELLS.length - 1, step: 1, value: 0, options: [...BASE_SHELLS] },

@@ -47,7 +47,7 @@ export const LOOK_BASE: Readonly<Record<string, number>> = {
   wild: 0, nested: 0, physics: 0, seasons: 0, cycleEvery: 0, beatLock: 0, text: 0,
   // the Organism's "Obvious" music response (step 4 defaults)
   speed: 1, musicAmount: 1, sustain: 1.5, fillRate: 1500, musicFocus: 0.5, musicTrail: 2.5,
-  thickness: 1, nodes: 1, length: 1, branch: 1, wiggle: 1, lignify: 1.6, join: 1, retract: 1, maxLive: 24, cohesion: 0.35,
+  thickness: 1, nodes: 1, length: 1, branch: 1, wiggle: 1, lignify: 1.6, join: 1, retract: 1, maxLive: 24, cohesion: 0.1,
   react: 1, pulse: 0.6, flash: 0.6, kick: 0, shake: 0.15, speedReact: 0.6, lightReact: 1, glow: 1,
   // bloom on (only bright things glow) and the rim that lets thin growth read on black
   bloom: 0.8, rim: 0.8, env: 0, envShader: 0,
@@ -55,11 +55,11 @@ export const LOOK_BASE: Readonly<Record<string, number>> = {
   softWave: 1, softReact: 1, softSpeed: 0.8, softIdle: 0.05, softFollow: 1,
   tipShape: 0, tipSize: 1, tipBrightness: 1,
   // note events (organism/ignition.ts): flare, shock ring, attack lunge, envelope 2 = strike
-  ignite: 1, igniteRing: 0.6, lunge: 1, envelope: 2,
+  ignite: 1, igniteRing: 0.6, igniteRingSize: 0.5, lunge: 1, envelope: 2,
   // energy arcs (organism/song.ts): builds, drops and breakdowns, modest
   songResponse: 0.5,
   // pitch → space, harmony → structure, velocity → weight (organism/layout.ts): free roots unless a look picks a layout
-  layout: 0, layoutSpread: 1, harmony: 0.6, velocityLook: 1,
+  layout: 0, layoutSpread: 1, harmony: 0.3, velocityLook: 1,
   // conduction and age grading (organism/conduction.ts) at their defaults
   conduct: 1, conductBeat: 1, ageGrade: 0.6,
   // music breath (organism/breath.ts): growth reaches out with the music, draws back when it is quiet

@@ -191,6 +191,7 @@ export class Ignition implements OrganismFeature {
   readonly controls: FeatureControl[] = [
     { key: 'ignite', label: 'note ignition: a flare where each note starts (0 = off)', min: 0, max: 2, step: 0.05, value: 1, group: G },
     { key: 'igniteRing', label: 'ignition: shock ring spreading from the flare (0 = off)', min: 0, max: 2, step: 0.05, value: 0.6, group: G },
+    { key: 'igniteRingSize', label: 'ignition: shock ring size (how wide a ring spreads)', min: 0.1, max: 1.5, step: 0.05, value: 0.5, group: G },
     { key: 'lunge', label: "attack lunge: a note's first segments shoot out (0 = off)", min: 0, max: 2, step: 0.05, value: 1, group: G },
     { key: 'envelope', label: 'growth envelope: how a note grows, holds and fades after release', min: 0, max: ENVELOPES.length - 1, step: 1, value: 2, options: ENVELOPES.map((e) => e.name), group: G },
   ]
@@ -206,6 +207,7 @@ export class Ignition implements OrganismFeature {
   // control values, read once a frame (the growth loop asks per tip)
   private amt = 1
   private ringAmt = 0.6
+  private ringSize = 0.5
   private lungeAmt = 1
   private env: GrowthEnvelope = ENVELOPES[2]
   private readonly dummy = new THREE.Object3D()
@@ -273,6 +275,7 @@ export class Ignition implements OrganismFeature {
     if (!c) return
     this.amt = ctl(c, 'ignite')
     this.ringAmt = ctl(c, 'igniteRing')
+    this.ringSize = ctl(c, 'igniteRingSize')
     this.lungeAmt = ctl(c, 'lunge')
     this.env = ENVELOPES[Math.round(ctl(c, 'envelope'))] ?? ENVELOPES[2]
   }
@@ -327,7 +330,7 @@ export class Ignition implements OrganismFeature {
       r.q.setFromUnitVectors(Z_AXIS, n.normalize())
       r.color.copy(c)
       r.t0 = t
-      r.size = size * (0.9 + 0.6 * s) * (0.85 + 0.3 * Math.random())
+      r.size = size * (0.9 + 0.6 * s) * (0.85 + 0.3 * Math.random()) * this.ringSize
       r.heat = ringHeat
       r.seed = Math.random()
       r.now = ringHeat
