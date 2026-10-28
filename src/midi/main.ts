@@ -18,9 +18,12 @@ import { OrganismEngine, FRAME_CAPS } from './engines/organism'
 import { loadPresets, savePresets, Morph, SLOTS, type Preset } from './presets'
 import { snapshot, download, stamp } from './recorder'
 import { setupRecording, loadRecSettings, REC_DEFAULTS, type RecSettings } from './recordUi'
-import { audioContext, recordingStream } from './audioCtx'
+import { audioContext, recordingStream, unlockAudio } from './audioCtx'
 import { Caster } from './cast'
 import { SoundBack, Instrument, INSTRUMENTS } from './synth'
+
+/** the instrument the keys sound by default (an electric piano) */
+const KEYS_SOUND = INSTRUMENTS.indexOf('keys')
 import { GestureInput } from './vision'
 import { VideoField } from './videoField'
 import { VERSION } from './version'
@@ -78,6 +81,8 @@ interface Settings extends SimpleSettings {
   castUrl: string
   openSecs: Record<string, boolean>
   instrument: number
+  /** the last sounding instrument, for the keyboard bar's sound key */
+  instLast: number
   instVol: number
   recMode: string
   rec: RecSettings
@@ -89,6 +94,8 @@ interface Settings extends SimpleSettings {
   kickOff: boolean
   /** the on-screen keyboard under the stage */
   pianoKeys: boolean
+  /** the v0.24.1 switch to a sounding instrument by default has run in this browser */
+  keysSound: boolean
 }
 const LS = 'midiviz_settings_v3'
 const settings: Settings = {
@@ -107,7 +114,8 @@ const settings: Settings = {
   soundBack: false,
   castUrl: '',
   openSecs: {},
-  instrument: 0,
+  instrument: KEYS_SOUND,
+  instLast: KEYS_SOUND,
   instVol: 0.5,
   recMode: 'now',
   rec: { ...REC_DEFAULTS },
@@ -121,6 +129,7 @@ const settings: Settings = {
   freshCanvas: false,
   kickOff: false,
   pianoKeys: true,
+  keysSound: false,
 }
 /** Nobody has tuned the Organism in this browser yet: the first-run look may set it up. */
 let organismUntouched = true
@@ -144,6 +153,14 @@ let organismUntouched = true
   settings.lookStarted = settings.lookStarted === true
   settings.freshCanvas = settings.freshCanvas === true
   settings.pianoKeys = settings.pianoKeys !== false
+  const inst = (v: unknown, d: number) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < INSTRUMENTS.length ? (v as number) : d)
+  settings.instrument = inst(settings.instrument, KEYS_SOUND)
+  settings.instLast = inst(settings.instLast, KEYS_SOUND) || KEYS_SOUND
+  // v0.24.1: the keys sound by default; browsers that saved the old default (off) get it once
+  if (settings.keysSound !== true) {
+    if (settings.instrument === 0) settings.instrument = KEYS_SOUND
+    settings.keysSound = true
+  }
   organismUntouched = !(s.engineCtl && typeof s.engineCtl === 'object' && 'organism' in s.engineCtl)
   // v0.23.1: the camera kick (punch in on hits) is off by default; switch it off once in browsers
   // that saved the old default, after which a kick the user dials back in is kept
@@ -1342,7 +1359,7 @@ $('cast').onclick = () => {
 }
 
 // ---------------------------------------------------------------- on-screen keyboard
-const screenKeys = new PianoKeys($('pianoKeys'), clock, piano)
+const screenKeys = new PianoKeys($('pianoKeys'), clock, piano, unlockAudio)
 $('pianoDown').onclick = () => screenKeys.shift(-1)
 $('pianoUp').onclick = () => screenKeys.shift(1)
 {
@@ -1369,14 +1386,21 @@ $('pianoUp').onclick = () => screenKeys.shift(1)
     o.textContent = n
     sel.appendChild(o)
   })
-  instrument.preset = settings.instrument
-  instrument.volume = settings.instVol
-  sel.value = String(settings.instrument)
-  sel.onchange = () => {
+  const soundKey = $('pianoSound')
+  const setInstrument = (i: number) => {
     instrument.allOff()
-    instrument.preset = settings.instrument = parseInt(sel.value)
+    instrument.preset = settings.instrument = i
+    if (i) settings.instLast = i
+    sel.value = String(i)
+    setPressed(soundKey, i !== 0)
+    soundKey.title = i ? `sound on (${INSTRUMENTS[i]}) — tap to mute` : 'sound off — tap for sound'
     save()
   }
+  instrument.volume = settings.instVol
+  setInstrument(settings.instrument)
+  sel.onchange = () => setInstrument(parseInt(sel.value))
+  // the keyboard bar's sound key: off, or back to the last instrument
+  soundKey.onclick = () => setInstrument(settings.instrument ? 0 : settings.instLast)
   const vol = $<HTMLInputElement>('instVol')
   vol.value = String(settings.instVol)
   vol.oninput = () => {
