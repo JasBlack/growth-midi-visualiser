@@ -1752,7 +1752,7 @@ window.addEventListener('resize', () => engine?.resize())
 setupTheme(settings.theme) // set before the first paint (index.html); this bakes the case's dot grid
 document.getElementById('ver')!.textContent = 'v' + VERSION
 document.getElementById('hudVer')!.textContent = 'v' + VERSION
-document.title = `Growth v${VERSION} — MIDI / music visualiser`
+document.title = 'Growth - JAS.BLACK'
 for (const det of document.querySelectorAll<HTMLDetailsElement>('details.sec[id]')) rememberSection(det, det.id, det.open)
 renderGlobalControls()
 // Simple mode's card: a view of the same registry (the tier attribute was set before the first paint)

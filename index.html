@@ -13,7 +13,7 @@
       if (/[?&]ui=0(&|$)/.test(location.search)) document.documentElement.dataset.capture = ''
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Growth — MIDI / music visualiser</title>
+    <title>Growth - JAS.BLACK</title>
     <meta name="description" content="Play music and watch it grow living 3D organisms. MIDI, computer keyboard, audio files or a mic; records MP4 in the browser. Free, runs offline." />
     <meta name="theme-color" content="#0b0b0c" />
     <!-- icon inline so the single-file build has it offline; PNGs for browsers and home screens without SVG icons -->
@@ -104,7 +104,7 @@
       .ver { font: 500 9px var(--mono, ui-monospace, monospace); letter-spacing: .08em; color: var(--muted); white-space: nowrap; opacity: 0; transition: opacity .15s; }
       .brand:hover + .ver, .ver:hover { opacity: 1; }
       /* the green LED before every JAS.BLACK tool title */
-      .brand{display:inline-flex;align-items:center;gap:10px}.brand::before{content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+      .brand{display:inline-flex;align-items:center;gap:10px}.brand::before{translate:0 -.07em;content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
       #storageNote { font-size: 8.5px; letter-spacing: .08em; color: var(--accent2); white-space: nowrap; }
       .transport { display: flex; gap: 8px; align-items: center; }
       .status { display: flex; gap: 14px; font-size: 9px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
