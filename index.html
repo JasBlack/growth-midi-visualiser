@@ -23,7 +23,8 @@
     <!-- link previews (chat apps, social): absolute urls, the card lives in public/og.jpg -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="JAS.BLACK" />
-    <meta property="og:title" content="Growth — play music, watch it grow" />
+    <meta property="og:title" content="Growth - JAS.BLACK" />
+    <meta name="twitter:title" content="Growth - JAS.BLACK" />
     <meta property="og:description" content="A live music visualiser: every note grows a living 3D organism. MIDI, keyboard, audio or mic — free, in the browser." />
     <meta property="og:url" content="https://growth.jas.black/" />
     <meta property="og:image" content="https://growth.jas.black/og.jpg" />
@@ -104,7 +105,7 @@
       .ver { font: 500 9px var(--mono, ui-monospace, monospace); letter-spacing: .08em; color: var(--muted); white-space: nowrap; opacity: 0; transition: opacity .15s; }
       .brand:hover + .ver, .ver:hover { opacity: 1; }
       /* the green LED before every JAS.BLACK tool title */
-      .brand{display:inline-flex;align-items:center;gap:10px}.brand::before{translate:0 -.07em;content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+      .brand{display:inline-flex;align-items:center;gap:10px}.brand::before{content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
       #storageNote { font-size: 8.5px; letter-spacing: .08em; color: var(--accent2); white-space: nowrap; }
       .transport { display: flex; gap: 8px; align-items: center; }
       .status { display: flex; gap: 14px; font-size: 9px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
