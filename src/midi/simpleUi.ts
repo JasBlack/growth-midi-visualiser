@@ -39,6 +39,8 @@ export interface WidgetOpts {
   knob?: boolean
   /** a knob's neutral position 0..1: its ring lights from there to the value */
   centre?: number
+  /** the default a right-click goes back to (engine and global controls register theirs in main.ts) */
+  def?: number
 }
 
 export interface CtlLike {
@@ -205,9 +207,9 @@ export function setupSimple(host: SimpleHost) {
   const macroHost = $('macros')
   for (const m of MACROS) {
     const c: EngineControl = { key: `macro ${m.id}`, label: m.label, min: 0, max: 1, step: 0.01, value: s.macros[m.id] }
-    const w = host.slider(macroHost, `m:${m.id}`, c, (n) => rig.set(m.id, n), { knob: true, centre: NEUTRAL })
+    const w = host.slider(macroHost, `m:${m.id}`, c, (n) => rig.set(m.id, n), { knob: true, centre: NEUTRAL, def: NEUTRAL })
     if (w.wrap) {
-      w.wrap.title = `${m.title}. 0.5 = the look's own · drag or wheel (Shift: fine) · double-click: back to 0.5 · right-click: MIDI learn`
+      w.wrap.title = `${m.title}. 0.5 = the look's own · drag or wheel (Shift: fine) · double-click or right-click: back to 0.5 · Shift+right-click: MIDI learn`
       w.wrap.ondblclick = () => w.set(NEUTRAL)
     }
   }

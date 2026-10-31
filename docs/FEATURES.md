@@ -230,8 +230,8 @@ Life, Stems, Performance* · **Shared** (zoom, palette, decay) · **Presets** (e
   grid horizon, aurora, deep sea sky spheres). Both run on WebGPU and the
   WebGL2 fallback; add your own in `src/midi/shaders.ts`.
 - **Performing:** 8 preset slots with a 2 s morph (click / shift+click /
-  `Shift+1…8` / MIDI program change), MIDI CC learn (right-click a slider,
-  move a knob), tempo from onsets or MIDI clock with beat-sync options,
+  `Shift+1…8` / MIDI program change), MIDI CC learn (Shift+right-click a slider,
+  move a knob; a plain right-click puts a slider back to its default), tempo from onsets or MIDI clock with beat-sync options,
   `R` record (start now, after a 3 s countdown, or on the next note). Frames
   are encoded with WebCodecs the moment they are drawn and written into a
   proper container: MP4 (H.264 High + AAC, index at the front, even

@@ -134,6 +134,8 @@ const settings: Settings = {
   keysSound: false,
   spreadOut: false,
 }
+/** The authored values, before this browser's stored settings are merged in (right-click resets to these). */
+const SETTING_DEFAULTS: Readonly<Record<string, unknown>> = { ...settings }
 /** Nobody has tuned the Organism in this browser yet: the first-run look may set it up. */
 let organismUntouched = true
 {
@@ -235,6 +237,8 @@ interface Ctl {
   refreshCc?: () => void
 }
 const ctls = new Map<string, Ctl>()
+/** Each slider's default, by control id: right-click a slider to go back to it. */
+const DEFAULTS = new Map<string, number>()
 let learning: Ctl | null = null
 
 function setStatus(s: string) {
@@ -263,6 +267,7 @@ function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: n
   }
   refreshCc()
   wrap.dataset.search = c.key // "Find a setting" also knows controls by their key
+  if (opts.def !== undefined) DEFAULTS.set(id, opts.def)
   let ctl: Ctl
   if (isSwitch(c) && !opts.knob) {
     // an LED key: on / off, the label beside it
@@ -353,10 +358,10 @@ function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: n
       },
     }
   }
-  // right-click: MIDI CC learn
+  // right-click a slider: back to its default · Shift+right-click (or right-click a switch / list): MIDI CC learn
   wrap.oncontextmenu = (e) => {
     e.preventDefault()
-    toggleLearn(ctl)
+    if (e.shiftKey || learning === ctl || !resetCtl(ctl)) toggleLearn(ctl)
   }
   ctl.wrap = wrap
   ctl.refreshCc = refreshCc
@@ -365,7 +370,16 @@ function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: n
   return ctl
 }
 
-/** MIDI CC learn for a control (right-click its slider, or a quick control bound to it); again cancels. */
+/** Right-click: a slider goes back to its default. False when the control is not a slider or has no known default. */
+function resetCtl(ctl: Ctl): boolean {
+  const d = DEFAULTS.get(ctl.id)
+  if (d === undefined || ctl.c.options || ctl.c.icon || isSwitch(ctl.c)) return false
+  ctl.set(d)
+  setStatus(`${ctl.c.label}: back to its default (${+d.toFixed(3)})`)
+  return true
+}
+
+/** MIDI CC learn for a control (Shift+right-click its slider, or a quick control bound to it); again cancels. */
 function toggleLearn(ctl: Ctl) {
   if (learning === ctl) {
     learning = null
@@ -376,8 +390,8 @@ function toggleLearn(ctl: Ctl) {
   document.querySelectorAll('.learn').forEach((el) => el.classList.remove('learn'))
   learning = ctl
   ctl.wrap?.classList.add('learn')
-  setInteract(`move a MIDI knob to map "${ctl.c.label}" (right-click again to cancel)`)
-  setStatus(`MIDI learn: move a knob or fader on your controller for "${ctl.c.label}" — right-click again or Esc cancels`)
+  setInteract(`move a MIDI knob to map "${ctl.c.label}" (Shift+right-click again to cancel)`)
+  setStatus(`MIDI learn: move a knob or fader on your controller for "${ctl.c.label}" — Shift+right-click again or Esc cancels`)
 }
 
 function refreshCcTags() {
@@ -426,7 +440,10 @@ async function mountEngine(idx: number, id: string) {
     for (const k of [...ctls.keys()]) if (k.startsWith('e:')) ctls.delete(k)
     const e = ENGINES[idx]()
     const saved = settings.engineCtl[e.id] ?? {}
-    for (const c of e.controls) if (saved[c.key] !== undefined) c.value = saved[c.key]
+    for (const c of e.controls) {
+      DEFAULTS.set(`e:${e.id}:${c.key}`, c.value)
+      if (saved[c.key] !== undefined) c.value = saved[c.key]
+    }
     e.onEvent = (kind, pitch, vel) => sound.play(kind, pitch, vel)
     e.onStatus = (s) => setStatus(s)
     e.setVideoField?.(videoField)
@@ -670,6 +687,8 @@ function renderGlobalControls() {
     { key: 'beatPalette', label: 'beat sync: next palette every bar (0 / 1)', min: 0, max: 1, step: 1, value: settings.beatPalette, apply: (n) => (settings.beatPalette = n) },
   ]
   for (const d of defs) {
+    const def = SETTING_DEFAULTS[d.key]
+    if (typeof def === 'number') DEFAULTS.set(`g:${d.key}`, def)
     widget(host, `g:${d.key}`, d, (n) => {
       d.apply(n)
       save()
@@ -679,6 +698,7 @@ function renderGlobalControls() {
   // lives with the input it tunes; still a g: control, so it is MIDI-learnable and kept in presets
   const sens: EngineControl = { key: 'audioSens', label: 'audio sensitivity: how small a hit still grows (0.5 = standard)', min: 0, max: 1, step: 0.05, value: settings.audioSens }
   $('audioSensRow').innerHTML = ''
+  DEFAULTS.set('g:audioSens', SETTING_DEFAULTS.audioSens as number)
   widget($('audioSensRow'), 'g:audioSens', sens, (n) => {
     audio.sensitivity = settings.audioSens = n
     save()
@@ -1124,7 +1144,7 @@ for (const [id, key] of REF_SLIDERS) {
     const c = refCtl(key)
     if (!c) return
     e.preventDefault()
-    toggleLearn(c)
+    if (e.shiftKey || learning === c || !resetCtl(c)) toggleLearn(c)
   }
 }
 $('refEnable').onclick = () => void activateReference()
@@ -1419,6 +1439,11 @@ $('pianoUp').onclick = () => screenKeys.shift(1)
   vol.oninput = () => {
     instrument.volume = settings.instVol = parseFloat(vol.value)
     save()
+  }
+  vol.oncontextmenu = (e) => {
+    e.preventDefault()
+    vol.value = String(SETTING_DEFAULTS.instVol)
+    vol.dispatchEvent(new Event('input', { bubbles: true }))
   }
 }
 sound.enabled = settings.soundBack

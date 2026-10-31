@@ -66,7 +66,7 @@ export function makeKnob(inp: HTMLInputElement, centre?: number): Knob {
 
   let drag: { id: number; y: number; x: number } | null = null
   el.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return // right-click stays MIDI learn (the row's contextmenu)
+    if (e.button !== 0) return // right-click is the row's contextmenu (reset; Shift: MIDI learn)
     e.preventDefault()
     inp.focus({ preventScroll: true })
     try {

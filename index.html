@@ -99,8 +99,10 @@
       #topbar .hl, #topbar .hr { display: flex; align-items: center; gap: 14px; min-width: 0; }
       #topbar .hr { justify-content: flex-end; gap: 8px; }
       .brandbox { display: flex; align-items: center; gap: 9px; flex: none; }
-      .brand { font: 800 13px/1 var(--wide); letter-spacing: .32em; white-space: nowrap; color: var(--text); margin-right: -.32em; }
-      .ver { font-size: 8.5px; letter-spacing: .1em; color: var(--muted); }
+      .brand { font: 800 13px/1 var(--wide); letter-spacing: .32em; white-space: nowrap; color: var(--text); margin-right: -.32em; cursor: default; }
+      /* the version: only while the title is hovered */
+      .ver { font: 500 9px var(--mono, ui-monospace, monospace); letter-spacing: .08em; color: var(--muted); white-space: nowrap; opacity: 0; transition: opacity .15s; }
+      .brand:hover + .ver, .ver:hover { opacity: 1; }
       #storageNote { font-size: 8.5px; letter-spacing: .08em; color: var(--accent2); white-space: nowrap; }
       .transport { display: flex; gap: 8px; align-items: center; }
       .status { display: flex; gap: 14px; font-size: 9px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
@@ -461,7 +463,6 @@
           <div class="hl">
             <div class="brandbox">
               <span class="brand">GROWTH</span>
-              <span class="led g" aria-hidden="true"></span>
               <span id="ver" class="ver"></span>
               <span id="storageNote" hidden title="browser storage is unavailable: settings and preset slots last for this session only">session only</span>
             </div>
@@ -580,12 +581,12 @@
           </details>
 
           <!-- 3. performance macros, in both tiers: each knob moves many controls around the look's own
-               values (0.5 = the look as authored); right-click one to MIDI-learn it -->
+               values (0.5 = the look as authored); Shift+right-click one to MIDI-learn it -->
           <details class="sec panel step" id="sec-macros" open>
             <summary><i class="num">3</i><b>Response</b><span class="hint">0.5 = the look</span></summary>
             <div class="body">
               <div id="macros" class="macros knobs" role="group" aria-label="Macros"></div>
-              <p class="note">drag or wheel · double-click: back to 0.5 · right-click: MIDI learn</p>
+              <p class="note">drag or wheel · double-click or right-click: back to 0.5 · Shift+right-click: MIDI learn</p>
             </div>
           </details>
 
@@ -704,7 +705,7 @@
               </div>
               <div class="row">
                 <button id="ccClear" type="button" title="forget all MIDI CC mappings">clear MIDI map</button>
-                <span class="note">right-click a control, then move a knob</span>
+                <span class="note">Shift+right-click a control, then move a knob</span>
               </div>
               <div id="interactStatus" class="mono-ok"></div>
             </div>
