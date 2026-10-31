@@ -103,6 +103,8 @@
       /* the version: only while the title is hovered */
       .ver { font: 500 9px var(--mono, ui-monospace, monospace); letter-spacing: .08em; color: var(--muted); white-space: nowrap; opacity: 0; transition: opacity .15s; }
       .brand:hover + .ver, .ver:hover { opacity: 1; }
+      /* the green LED before every JAS.BLACK tool title */
+      .brand{display:inline-flex;align-items:center;gap:10px}.brand::before{content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
       #storageNote { font-size: 8.5px; letter-spacing: .08em; color: var(--accent2); white-space: nowrap; }
       .transport { display: flex; gap: 8px; align-items: center; }
       .status { display: flex; gap: 14px; font-size: 9px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
