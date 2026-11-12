@@ -1261,7 +1261,7 @@ window.addEventListener('drop', (e) => {
   const isAudio = (x: File) => x.type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(x.name)
   const isVideo = (x: File) => x.type.startsWith('video/') || /\.(mp4|mov|webm|m4v|avi)$/i.test(x.name)
   const isImage = (x: File) => x.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(x.name)
-  if (/\.(glb|gltf|obj|stl)$/i.test(f.name) && engine?.loadShell) void loadModel(f).then(setStatus)
+  if (/\.(glb|gltf|obj|stl)$/i.test(f.name)) void simple.loadModelFile(f)
   else if (isVideo(f)) void openVideo(f)
   else if (isImage(f)) void openImage(f)
   else if (all.some(isAudio)) {

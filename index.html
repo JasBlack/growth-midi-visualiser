@@ -186,6 +186,9 @@
       .row > .grow, .row > select.grow, .row > input.grow { flex: 1; min-width: 0; }
       .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
       .trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .quad { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+      .modelrow { align-items: center; gap: 8px; }
+      .modelrow #modelName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .lbl { font-size: 9px; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
       #colRight .row > .lbl:first-child { min-width: 58px; } /* console rows: the wells line up */
       .note { color: var(--muted); font-size: 9.5px; line-height: 1.5; margin: 0; }
@@ -536,16 +539,23 @@
               </div>
               <div class="playlist" id="playlist" hidden></div>
               <div id="audioSensRow" class="ctl-list" hidden></div>
-              <div class="trio">
+              <div class="quad">
                 <button id="videoFile" type="button" title="a video steers the growth (not the sound)">video</button>
                 <button id="videoCam" type="button" title="the camera steers the growth">camera</button>
                 <button id="videoImage" type="button" title="growth draws the picture in 3D over time">picture</button>
+                <button id="srcModelPick" type="button" title="a 3D model (.glb, .gltf, .obj or .stl): the music grows over its surface">3D model</button>
               </div>
+              <!-- the loaded 3D model, while there is one (simpleUi.ts) -->
+              <div class="row modelrow" id="modelRow" hidden>
+                <span class="led g" aria-hidden="true"></span><span id="modelName" class="grow"></span>
+                <button id="modelRemove" type="button" title="take the model away: the music grows freely">remove</button>
+              </div>
+              <div class="note">3D model: <b>.glb</b>, .gltf, .obj or .stl — or drop the file anywhere on the page</div>
               <button id="videoStop" type="button" hidden>stop video</button>
               <div class="row" id="videoDeviceRow" hidden>
                 <select id="videoDevice" class="grow" aria-label="Camera input"></select>
               </div>
-              <div id="videoStatus" class="note">a picture, video or camera becomes a 3D shape the music grows over</div>
+              <div id="videoStatus" class="note">a picture, video, camera or 3D model becomes a shape the music grows over</div>
               <!-- quick controls: the same values as the Organism's Video section (presets, MIDI learn, saved settings) -->
               <div id="referenceTools" class="subpanel" hidden>
                 <div class="row">
@@ -616,13 +626,13 @@
               <div class="intents" role="group" aria-label="Draw a source">
                 <button id="srcTrace" type="button" aria-pressed="false" title="music draws along a picture's lines (asks for a picture when none is open)">trace details</button>
                 <button id="srcRelief" type="button" aria-pressed="false" title="music grows across a picture's relief (asks for a picture when none is open)">grow over relief</button>
-                <button id="srcModel" type="button" aria-pressed="false" title="music builds the surface of a 3D model (asks for one when none is loaded)">skin 3D model</button>
+                <button id="srcModel" type="button" aria-pressed="false" title="music builds the surface of a 3D model (asks for one when none is loaded)">grow on 3D model</button>
                 <button id="srcOff" type="button" aria-pressed="false" title="no picture, video, camera or model: the music grows freely">music only</button>
               </div>
               <div class="row">
-                <button id="modelPick" type="button" title="glb, gltf, obj or stl — or drop one on the page">load 3D model…</button>
+                <button id="modelPick" type="button" title="glb, gltf, obj or stl — or drop one on the page">upload 3D model…</button>
                 <input id="modelFile" type="file" accept=".glb,.gltf,.obj,.stl" hidden />
-                <span class="note">video · camera · picture: in 1</span>
+                <span class="note">.glb · .obj · .stl · video, camera, picture: in 1</span>
               </div>
             </div>
           </details>
@@ -789,7 +799,7 @@
       </main>
     </div>
 
-    <div id="drop">drop audio · video · picture · a model</div>
+    <div id="drop">drop audio · video · picture · 3D model</div>
     <!-- outside the panel: the panel is inert while hidden -->
     <button id="returnUi" class="key w" type="button" title="Esc, F2 or `">show controls · esc</button>
     <div id="toasts" class="ui-overlay" aria-live="polite"></div>
