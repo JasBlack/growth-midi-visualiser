@@ -22,6 +22,13 @@ export const PALETTES: Palette[] = [
   { name: 'spectrum', a: [0.5, 0.5, 0.5], b: [0.5, 0.5, 0.5], c: [1, 1, 1], d: [0.0, 0.33, 0.67], pitchSpread: 1 },
   // the Webs look's: silver greys leaning dusty pink and steel blue (appended: saved palettes are indices)
   { name: 'smoke', a: [0.6, 0.58, 0.62], b: [0.16, 0.1, 0.12], c: [1, 1, 1], d: [0.0, 0.33, 0.6], pitchSpread: 0.7 },
+  // one colour world per organic look, so Roots, Coral and Neural never read alike (appended)
+  // Roots: umber, ochre and bark browns
+  { name: 'earth', a: [0.52, 0.34, 0.2], b: [0.2, 0.15, 0.1], c: [1, 1, 1], d: [0.5, 0.55, 0.62], pitchSpread: 0.35 },
+  // Coral: reef magenta through coral pink and peach to gold
+  { name: 'reef', a: [0.88, 0.45, 0.42], b: [0.12, 0.32, 0.22], c: [1, 1, 1], d: [0.0, 0.08, 0.45], pitchSpread: 0.4 },
+  // Neural: electric blue, violet and pale cyan
+  { name: 'synapse', a: [0.4, 0.5, 0.95], b: [0.3, 0.38, 0.08], c: [1, 1, 1], d: [0.55, 0.45, 0.3], pitchSpread: 0.6 },
 ]
 
 export function cosPalette(p: Palette, t: number, phase = 0): [number, number, number] {

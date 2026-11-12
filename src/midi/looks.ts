@@ -61,7 +61,7 @@ export const LOOK_BASE: Readonly<Record<string, number>> = {
   // pitch → space, harmony → structure, velocity → weight (organism/layout.ts): free roots unless a look picks a layout
   layout: 0, layoutSpread: 1, harmony: 0.3, velocityLook: 1,
   // conduction and age grading (organism/conduction.ts) at their defaults
-  conduct: 1, conductBeat: 1, ageGrade: 0.6,
+  conduct: 1, conductSpeed: 7, conductBeat: 1, ageGrade: 0.6,
   // music breath (organism/breath.ts): growth reaches out with the music, draws back when it is quiet
   breath: 0.55,
   // the Webs scenery (organism/flight.ts, debris.ts, haze.ts): no debris, ambient web or ribbons;
@@ -80,30 +80,34 @@ export const LOOKS: readonly LookRecipe[] = [
     label: 'Roots',
     species: ['roots', 'fungi'],
     speciesMode: 1,
-    palettes: ['forest', 'ember', 'mono'],
-    shaders: ['marble', 'mottle', 'veins'],
-    // strata: the bass roots down into the dark, the melody branches up into a canopy
-    values: { branch: 0.8, wiggle: 1.15, length: 0.9, thickness: 1.15, nodes: 0.7, layout: 1, breath: 0.6 },
+    palettes: ['earth', 'forest', 'ember'],
+    shaders: ['mottle', 'marble', 'cracks'],
+    // gnarled and earthy: thick at the base, splitting into fine hair roots; matte bark, dim tips,
+    // little glow; old growth keeps most of its colour (a little age grading). Strata: the bass
+    // roots down into the dark, the melody branches up
+    values: { branch: 1.35, wiggle: 1.45, length: 0.8, thickness: 1.3, nodes: 0.35, glow: 0.35, tipBrightness: 0.5, rim: 0.35, bloom: 0.4, igniteRing: 0.25, conduct: 0.5, ageGrade: 0.3, layout: 1, breath: 0.6 },
   },
   {
     id: 'coral',
     label: 'Coral',
-    species: ['corals', 'staghorn coral', 'sea fan'],
+    species: ['corals', 'staghorn coral'],
     speciesMode: 1,
-    palettes: ['candy', 'ocean', 'ember'],
-    shaders: ['mottle', 'scales', 'pearl currents'],
-    // coral breathes slowly in and out, like polyps
-    values: { branch: 0.9, wiggle: 0.7, length: 0.85, thickness: 1.25, nodes: 0.9, breath: 0.5 },
+    palettes: ['reef', 'candy', 'ocean'],
+    shaders: ['cells', 'scales', 'pearl currents'],
+    // chunky, stiff and upright: short stubby branches with knobbly rounded tips in reef colours,
+    // a polyp texture; it breathes slowly in and out
+    values: { branch: 1.1, wiggle: 0.3, length: 0.6, thickness: 1.85, nodes: 1.6, tipShape: 0, tipSize: 1.4, glow: 0.8, rim: 1, bloom: 0.6, igniteRing: 0.4, ageGrade: 0.1, breath: 0.5 },
   },
   {
     id: 'neural',
     label: 'Neural',
-    species: ['neuron', 'veins'],
+    species: ['neuron'],
     speciesMode: 1,
-    palettes: ['spectrum', 'acid', 'ocean'],
-    shaders: ['veins', 'biolume', 'electric filaments'],
-    // fifths: consonant notes wire up together, a clash stands apart
-    values: { branch: 0.9, wiggle: 1.2, length: 0.85, thickness: 0.8, nodes: 1.15, glow: 1.4, igniteRing: 0.8, layout: 3, breath: 0.55 },
+    palettes: ['synapse', 'spectrum', 'acid'],
+    shaders: ['biolume', 'electric filaments', 'veins'],
+    // fine long axons and bright cell bodies in electric blue; strong, fast light pulses run along
+    // them. Fifths: consonant notes wire up together, a clash stands apart
+    values: { branch: 1.1, wiggle: 1, length: 1.3, thickness: 0.45, nodes: 1.8, glow: 2, tipBrightness: 1.5, rim: 1.2, bloom: 1.2, conduct: 2, conductSpeed: 10, igniteRing: 0.5, ageGrade: 0.25, layout: 3, breath: 0.55 },
   },
   {
     id: 'crystal',
