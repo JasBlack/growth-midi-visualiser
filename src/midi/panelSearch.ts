@@ -11,7 +11,7 @@
 const TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(hover: none) and (pointer: coarse)').matches
 const IDLE_HELP = TOUCH
   ? 'Tap or slide on the keys under the stage to grow · perform for full screen'
-  : 'Hold A–K to grow · F2 or ` hides controls · Esc brings them back'
+  : ''   // (the keys are in the key-hint bar under the stage)
 const NO_MATCH = 'No matching settings. Try “species”, “camera” or “decay”.'
 const HIDE = 'data-search-hidden'
 
