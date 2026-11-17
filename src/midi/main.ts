@@ -37,6 +37,7 @@ import { paintRange, paintRangesOnInput, setPressed } from './ui/dom'
 import { PianoKeys } from './ui/pianoKeys'
 import { makeKnob } from './ui/knob'
 import { asTheme, setupTheme, applyTheme, type Theme } from './ui/theme'
+import { setupResetMenu, rememberDefaults } from './ui/reset'
 import { toast } from './ui/toast'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -358,7 +359,7 @@ function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: n
       },
     }
   }
-  // right-click a slider: back to its default · Shift+right-click (or right-click a switch / list): MIDI CC learn
+  // right-click any control (fader, knob, switch, list): back to its default · Shift+right-click: MIDI CC learn
   wrap.oncontextmenu = (e) => {
     e.preventDefault()
     if (e.shiftKey || learning === ctl || !resetCtl(ctl)) toggleLearn(ctl)
@@ -370,12 +371,13 @@ function widget(host: HTMLElement, id: string, c: EngineControl, onChange: (v: n
   return ctl
 }
 
-/** Right-click: a slider goes back to its default. False when the control is not a slider or has no known default. */
+/** Right-click: a control (fader, knob, switch or list) goes back to its default. False when it has no known default. */
 function resetCtl(ctl: Ctl): boolean {
   const d = DEFAULTS.get(ctl.id)
-  if (d === undefined || ctl.c.options || ctl.c.icon || isSwitch(ctl.c)) return false
+  if (d === undefined) return false
   ctl.set(d)
-  setStatus(`${ctl.c.label}: back to its default (${+d.toFixed(3)})`)
+  const shown = ctl.c.options?.[d] ?? (isSwitch(ctl.c) ? (d > 0 ? 'on' : 'off') : String(+d.toFixed(3)))
+  setStatus(`${ctl.c.label}: back to its default (${shown})`)
   return true
 }
 
@@ -1185,7 +1187,8 @@ $('materialPick').oncontextmenu = (ev) => {
   const c = materialCtl()
   if (!c) return
   ev.preventDefault()
-  toggleLearn(c)
+  if (ev.shiftKey || learning === c || !resetCtl(c)) toggleLearn(c)
+  else syncMaterial()
 }
 $('materialNext').onclick = () => {
   const c = materialCtl()
@@ -1749,7 +1752,7 @@ async function applyParams() {
 
 // ---------------------------------------------------------------- boot
 window.addEventListener('resize', () => engine?.resize())
-setupTheme(settings.theme) // set before the first paint (index.html); this bakes the case's dot grid
+setupTheme(settings.theme) // set before the first paint (index.html)
 document.getElementById('ver')!.textContent = 'v' + VERSION
 document.getElementById('hudVer')!.textContent = 'v' + VERSION
 document.title = 'Growth - JAS.BLACK'
@@ -1784,6 +1787,8 @@ const launchParams = ['engine', 'preset', 'cam', 'ui'].some((k) => params.has(k)
 void selectEngine(ENGINE_META.some((e) => e.id === settings.engine) ? settings.engine : 'organism')
   .then(applyParams)
   .then(() => simple.firstRun(launchParams || !organismUntouched || engine?.id !== 'organism'))
+  .then(() => rememberDefaults()) // right-click a setting: back to how it was when the page loaded
+setupResetMenu((name) => setStatus(`${name || 'setting'}: back to its default`))
 piano.enabled = true
 paintRangesOnInput() // the faders' green fill: every drag repaints, and the static ones start right
 // debug handle (console): window.__viz.clock.state, window.__viz.audio.features, window.__viz.engine
