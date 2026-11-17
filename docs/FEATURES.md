@@ -7,6 +7,24 @@ growths bind into one structure. Feed it MIDI, an audio file or a microphone.
 
 Vite + TypeScript + three (WebGPU, WebGL2 fallback). No backend.
 
+## v0.25.0 — three distinct organic looks, an easy 3D upload
+
+- **Roots, Coral and Neural no longer look alike.** Each has its own colour world
+  (new palettes **earth**, **reef** and **synapse**) and its own habit:
+  - **Roots**: gnarled and earthy, thick at the base and splitting into fine hair
+    roots; warm browns, matte, dim tips.
+  - **Coral**: chunky, stiff, upright and knobbly, with a polyp texture, in reef
+    magenta, coral pink, peach and gold.
+  - **Neural**: fine long axons with bright cell bodies in electric blue; strong,
+    fast pulses of light run along them.
+  These three keep most of their colour as growth ages (less **age grading**), so
+  they stay distinct after a minute of playing.
+- **Uploading a 3D model:** a **3D model** button in step 1 (Source), next to
+  video / camera / picture. `.glb`, `.gltf`, `.obj` or `.stl`; dropping the file
+  anywhere on the page does the same. The music then grows over the model's
+  surface; the loaded model shows under the buttons with **remove**. Step 5's button
+  is now **grow on 3D model**. A file that is not a model says so.
+
 ## v0.24.2 — smaller rings, growths spread out
 
 - **Smaller shock rings:** the rings of light that spread from a note's flare are

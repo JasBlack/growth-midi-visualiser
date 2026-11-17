@@ -74,7 +74,7 @@ function glowDot(g: Ctx, x: number, y: number, rad: number, colour: string) {
 }
 
 function roots(g: Ctx, r: Rng) {
-  const p = pal('forest')
+  const p = pal('earth')
   g.lineCap = 'round'
   const habit = (heading: number, pull: number): Habit => ({
     wiggle: 0.45, pull, heading, fork: 0.13, spread: 0.75, step: 3, depth: 4,
@@ -88,7 +88,7 @@ function roots(g: Ctx, r: Rng) {
 }
 
 function coral(g: Ctx, r: Rng) {
-  const p = pal('candy')
+  const p = pal('reef')
   g.lineCap = 'round'
   const h: Habit = {
     wiggle: 0.35, pull: 0.03, heading: -Math.PI / 2, fork: 0.16, spread: 0.55, step: 3.5, depth: 3,
@@ -104,7 +104,7 @@ function coral(g: Ctx, r: Rng) {
 }
 
 function neural(g: Ctx, r: Rng) {
-  const p = pal('spectrum')
+  const p = pal('synapse')
   const nodes = Array.from({ length: 7 }, () => ({ x: 22 + r() * 116, y: 22 + r() * 116 }))
   g.globalCompositeOperation = 'lighter'
   g.lineCap = 'round'

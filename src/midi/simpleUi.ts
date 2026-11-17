@@ -15,6 +15,7 @@ import { FRAMED_SPEED, LOOKS, LOOK_GLOBALS, lookCamera, pickSurprise, resolveLoo
 import { MACROS, MacroRig, NEUTRAL, type MacroPositions } from './macros'
 import { setPressed } from './ui/dom'
 import { lookThumb } from './ui/lookTiles'
+import { toast } from './ui/toast'
 
 export type UiTier = 'simple' | 'advanced'
 
@@ -90,7 +91,7 @@ const INTENTS: Record<Intent, Record<string, number>> = {
 const INTENT_STATUS: Record<Intent, string> = {
   trace: 'Trace details — the music draws along the picture’s lines and relief.',
   relief: 'Grow over relief — the music grows across the picture’s surface.',
-  model: 'Skin 3D model — the music builds the model’s surface.',
+  model: 'Grow on 3D model — the music builds the model’s surface.',
   off: 'Music only — no source; the music grows freely.',
 }
 /** framed mode turns at 0.12 × camera speed rad/s: 1.5 is a turn in about 35 s */
@@ -299,22 +300,49 @@ export function setupSimple(host: SimpleHost) {
   }
   for (const [intent, b] of Object.entries(intentBtns) as [Intent, HTMLButtonElement][]) b.onclick = () => void chooseIntent(intent)
 
+  // 3D models: a button in Source and in Draw a source, or a file dropped on the page, all load
+  // here and switch the music to growing over the model's surface
   const modelFile = $<HTMLInputElement>('modelFile')
+  // iOS greys out file types it does not know (.glb, .stl) when the picker filters by extension:
+  // there it lists every file, and loadModelFile says when one is not a model
+  const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent))
+  if (iOS) modelFile.removeAttribute('accept')
   $('modelPick').onclick = () => modelFile.click()
-  modelFile.onchange = async () => {
+  $('srcModelPick').onclick = () => modelFile.click()
+  modelFile.onchange = () => {
     const f = modelFile.files?.[0]
     modelFile.value = '' // the same file again loads again
-    if (!f || !(await host.organism())) return
+    if (f) void loadModelFile(f)
+  }
+  async function loadModelFile(f: File) {
+    if (!(await host.organism())) return
     host.setStatus(`loading ${f.name}…`)
+    const shell = () => host.ctl(org('shell'))?.c.value ?? 0
+    const before = shell()
     const msg = await host.loadModel(f)
-    if ((host.ctl(org('shell'))?.c.value ?? 0) > 0) host.apply(values('model'), 0)
-    host.setStatus(msg)
+    // a model that loaded is selected as a new shell; a failed one leaves the old selection
+    if (shell() > 0 && shell() !== before) {
+      host.apply(values('model'), 0)
+      host.setStatus(`${msg} — play: the music grows over its surface`)
+      toast(`3D model loaded · ${f.name}`)
+    } else {
+      host.setStatus(msg.replace(/^shell: /, ''))
+      toast(`could not open ${f.name} as a 3D model — try a .glb, .obj or .stl`, 'err')
+    }
+    sync()
+  }
+  const modelRow = $('modelRow')
+  const modelName = $('modelName')
+  $('modelRemove').onclick = () => {
+    host.apply({ [org('shell')]: 0, [org('shellMode')]: 0 }, 0)
+    host.setStatus('3D model removed — the music grows freely')
     sync()
   }
 
   // ------------------------------------------------------------ read back (cheap: DOM writes only on change)
   let shownCam = ''
   let shownIntent: Intent | null | undefined
+  let shownModel = ''
   function sync() {
     const style = camStyle()
     if (style !== shownCam) {
@@ -325,6 +353,16 @@ export function setupSimple(host: SimpleHost) {
         camOther.textContent = host.engine()?.id === 'organism' ? `now: ${CAM_MODES[mode] ?? 'camera'} (set in the console)` : 'camera styles: Organism only'
       }
       for (const b of camKeys) setPressed(b, b.dataset.cam === style)
+    }
+    // the loaded model (an uploaded file, not a built-in shape) and what the music does with it
+    const shell = host.ctl(org('shell'))?.c
+    const file = host.engine()?.id === 'organism' && shell && shell.value > 0 ? (shell.options?.[shell.value] ?? '') : ''
+    const model = /\.(glb|gltf|obj|stl)$/i.test(file) ? `${file} · ${(host.ctl(org('shellMode'))?.c.value ?? 0) === 1 ? 'the music grows over it' : 'growth inside it'}` : ''
+    if (model !== shownModel) {
+      shownModel = model
+      modelRow.hidden = !model
+      modelName.textContent = model
+      modelName.title = model
     }
     const intent = currentIntent()
     if (intent !== shownIntent) {
@@ -343,6 +381,8 @@ export function setupSimple(host: SimpleHost) {
     applyLook,
     surprise,
     sync,
+    /** a 3D model file (picked or dropped): load it and grow over its surface */
+    loadModelFile,
     /** per frame: a moving knob eases its controls in, a few writes a second */
     tick: () => rig.tick(),
     /** a registry value moved outside the macros: if a macro scales it, it scales from there now */
