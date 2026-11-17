@@ -17,7 +17,7 @@
     <meta name="description" content="Play music and watch it grow living 3D organisms. MIDI, computer keyboard, audio files or a mic; records MP4 in the browser. Free, runs offline." />
     <meta name="theme-color" content="#0b0b0c" />
     <!-- icon inline so the single-file build has it offline; PNGs for browsers and home screens without SVG icons -->
-    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect x="1" y="1" width="62" height="62" rx="14" fill="%230b0b0c" stroke="%232c2c2f" stroke-width="2"/%3E%3Cg fill="none" stroke="%2339ff88" stroke-width="5" stroke-linecap="round"%3E%3Cpath d="M29 56C30 46 27 40 31 32S34 19 29 12"/%3E%3Cpath d="M31 34C38 33 44 29 47 20"/%3E%3Cpath d="M29 44C23 42 17 38 16 29"/%3E%3Cpath d="M45 25C49 26 52 25 54 22" stroke-width="4"/%3E%3C/g%3E%3Cg fill="%23d9ffe9"%3E%3Ccircle cx="29" cy="12" r="4"/%3E%3Ccircle cx="47" cy="19" r="3.5"/%3E%3Ccircle cx="16" cy="28" r="3.5"/%3E%3C/g%3E%3C/svg%3E' />
+    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Cdefs%3E%3ClinearGradient id="pgv" x1="0" y1="58" x2="0" y2="10" gradientUnits="userSpaceOnUse"%3E%3Cstop offset="0" stop-color="%23922cff"/%3E%3Cstop offset=".42" stop-color="%23c855f5"/%3E%3Cstop offset=".85" stop-color="%233dfea0"/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x="1" y="1" width="62" height="62" rx="14" fill="%230b0b0c" stroke="%232c2c2f" stroke-width="2"/%3E%3Cg fill="none" stroke="url(%23pgv)" stroke-width="5" stroke-linecap="round"%3E%3Cpath d="M29 56C30 46 27 40 31 32S34 19 29 12"/%3E%3Cpath d="M31 34C38 33 44 29 47 20"/%3E%3Cpath d="M29 44C23 42 17 38 16 29"/%3E%3Cpath d="M45 25C49 26 52 25 54 22" stroke-width="4"/%3E%3C/g%3E%3Cg fill="%23ffffff"%3E%3Ccircle cx="29" cy="12" r="4"/%3E%3Ccircle cx="47" cy="19" r="3.5"/%3E%3Ccircle cx="16" cy="28" r="3.5"/%3E%3C/g%3E%3C/svg%3E' />
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <!-- link previews (chat apps, social): absolute urls, the card lives in public/og.jpg -->
@@ -39,7 +39,7 @@
     <style>
       /* ───────────── tokens: Code Painter's console (light / dark); the stage stays dark either way ───────────── */
       :root {
-        --accent: #39ff88; --accent2: #b36bff; --recred: #ff3b30; --stage: #0b0b0c; --lcd: #0b0b0c;
+        --accent: #39ff88; --accent2: #8b6cff; --recred: #ff3b30; --stage: #0b0b0c; --lcd: #0b0b0c;
         --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
         --wide: 'Archivo', 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
         --glow-g: 0 0 4px color-mix(in srgb, var(--accent) 90%, transparent);
@@ -49,22 +49,25 @@
         color-scheme: dark;
         --case: #121314; --panel: #18191b; --line: #26272a; --key: #222326; --keyon: #1b1c1e; --keyline: #303135; --keyshadow: #070708;
         --press: rgba(0,0,0,.5); --text: #e4e4e1; --muted: #7a7b80; --ledoff: #34353a; --knobtop: #2c2d31; --track: #2e2f33;
-        --well: #141517; --ink: #e4e4e1; --inktext: #121314; --thumb: #dcddd9; --dots: rgba(255,255,255,0.065);
+        --well: #141517; --ink: #e4e4e1; --inktext: #121314; --thumb: #dcddd9;
+        /* the case's dot grid: the family tile (16 px, white dots at 12/255), a baked image, never a CSS gradient */
+        --dotgrid: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAATElEQVR42u3OOQrAQAxDUSlp5v6ndROcRhcYM6TJf+DCAi8SAAB/5+lgd9+SVtqy/Uz2XMPjznGnVrJvHjhp9IDtllSSOlXJAADAthcsBBEI93xN9gAAAABJRU5ErkJggg==');
         --focus: var(--accent); --oktext: var(--accent);
       }
       html[data-theme='light'] {
         color-scheme: light;
         --case: #e7e7e4; --panel: #efefec; --line: #d6d6d2; --key: #fafaf8; --keyon: #ececea; --keyline: #cfcfcb; --keyshadow: #bdbdb8;
         --press: rgba(0,0,0,.12); --text: #1b1b1d; --muted: #77776f; --ledoff: #cdcdc9; --knobtop: #fafaf8; --track: #d0d0cc;
-        --well: #e4e4e1; --ink: #1b1b1d; --inktext: #f2f2ef; --thumb: #ffffff; --dots: rgba(0,0,0,0.11);
+        --well: #e4e4e1; --ink: #1b1b1d; --inktext: #f2f2ef; --thumb: #ffffff;
+        --dotgrid: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAUklEQVR42u3SPQrAMAhA4ZeGDl2a+5+za/qzeIJYWgLvA8FFURQkSZpciRhWE7Ur0IAN6MA10mRJbL7HAjXy8uUAr8mcoMcZbuAAzimfUJKk3z3AAQY6ol938gAAAABJRU5ErkJggg=='); /* black dots at 20/255 */
         /* green text and rings need more weight on a light case */
         --focus: #0b9a4c; --oktext: #0b8a45;
       }
       * { box-sizing: border-box; }
       html, body { margin: 0; height: 100%; overflow: hidden; }
-      /* the case: flat colour + the baked dot-grid tile (ui/theme.ts) */
+      /* the case: flat colour + the family's dot-grid tile (a 32 px PNG drawn at 16 px) */
       body {
-        background-color: var(--case); background-image: var(--dotgrid, none); background-size: 24px 24px; background-position: -12px -12px;
+        background: var(--dotgrid) 0 0/16px 16px, var(--case);
         color: var(--text); font: 400 11px/1.45 var(--mono); -webkit-font-smoothing: antialiased;
       }
       /* `hidden` must beat display:flex rows (mode rows, playlist, countdown); the search hides its own way */
@@ -336,9 +339,9 @@
       .find { display: flex; flex-direction: column; gap: 5px; flex: none; }
       #controlSearch { width: 100%; height: 32px; padding-left: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%238c8c88' stroke-width='1.6'%3E%3Ccircle cx='5' cy='5' r='4'/%3E%3Cpath d='M8 8l3.4 3.4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 10px center; }
       #searchHelp { margin: 0 2px; font-size: 8.5px; letter-spacing: .06em; color: var(--muted); line-height: 1.4; }
-      kbd { display: inline-block; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font: 500 8.5px/1.6 var(--mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; background: transparent; }
-      .body.keys { display: block; color: var(--muted); font-size: 9.5px; line-height: 2; } /* running text, not a column of items */
-      .keys kbd { color: var(--text); }
+      /* small raised keys, as in Align */
+      kbd { display: inline-block; min-width: 14px; padding: 0 4px; margin: 0 1px; border-radius: 3px; border: 1px solid var(--keyline); background: var(--key); box-shadow: 0 1px 0 var(--keyshadow); font: 500 8.5px/14px var(--mono); color: var(--text); text-align: center; }
+      .body.keylist { display: block; color: var(--muted); font-size: 9.5px; line-height: 2; } /* running text, not a column of items */
 
       /* ───────────── the stage well and the status line ───────────── */
       #centre { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
@@ -357,9 +360,9 @@
       #meter { display: inline-block; width: 48px; height: 4px; border-radius: 2px; background: #26272a; vertical-align: middle; overflow: hidden; margin-top: -2px; }
       #meter i { display: block; height: 100%; width: 0; background: var(--accent); }
       #hudRec.live { color: #ff6b62; }
-      .hints { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); padding: 0 6px; }
-      .hints span { white-space: nowrap; }
-      .hints kbd { margin-right: 4px; }
+      /* the family's key-hint bar along the bottom (as in Align): real shortcuts left, the right-click rule right */
+      .keys { flex: none; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 8.5px; color: var(--muted); letter-spacing: .08em; padding: 0 4px; }
+      @media (hover: none) and (pointer: coarse) { .keys { display: none; } }
       /* the readout gives way to the message when the stage is narrow (console mode, small windows) */
       @container (max-width: 860px) { #hud .wide { display: none; } }
       @container (max-width: 600px) { #hud { display: none; } }
@@ -451,7 +454,7 @@
         body:not(.hide-ui) .well { max-height: calc(100vh - 140px); max-height: calc(100svh - 140px); min-height: 150px; }
         body.no-piano:not(.hide-ui) .well { max-height: calc(100svh - 60px); }
         .pk.w[data-c]::after { font-size: 9px; bottom: 6px; }
-        .hints { display: none; }
+        .keys { display: none; }
         #hud { display: none; }
         .col { overflow: visible; margin: 0; padding: 0; }
         #toasts { right: 10px; left: 10px; bottom: 10px; align-items: stretch; }
@@ -472,7 +475,7 @@
               <span id="ver" class="ver"></span>
               <span id="storageNote" hidden title="browser storage is unavailable: settings and preset slots last for this session only">session only</span>
             </div>
-            <div class="seg" role="group" aria-label="Panel">
+            <div class="seg" role="group" aria-label="Panel" data-noreset>
               <button id="tierEasy" type="button" aria-pressed="true" title="the guided panel: six steps">easy</button>
               <button id="uiTier" type="button" aria-pressed="false" title="show every setting">console</button>
             </div>
@@ -534,7 +537,7 @@
                 <button id="prevBtn" type="button" title="previous track" aria-label="Previous track">⏮</button>
                 <button id="playBtn" type="button" title="Space" aria-label="Play or pause">▶</button>
                 <button id="nextBtn" type="button" title="next track" aria-label="Next track">⏭</button>
-                <input id="seek" class="grow" type="range" min="0" max="1000" value="0" aria-label="Track position" />
+                <input id="seek" data-noreset class="grow" type="range" min="0" max="1000" value="0" aria-label="Track position" />
                 <span id="timeLbl">0:00 / 0:00</span>
               </div>
               <div class="playlist" id="playlist" hidden></div>
@@ -585,7 +588,7 @@
           <details class="sec panel step" id="sec-make" open>
             <summary><i class="num">2</i><b>Look</b><span class="hint" id="lookName"></span></summary>
             <div class="body">
-              <div class="looks" id="looks" role="group" aria-label="Look"></div>
+              <div class="looks" id="looks" role="group" aria-label="Look" data-noreset></div>
               <div class="pair">
                 <button id="surprise" type="button" title="another look, lightly varied — what has grown stays (unless fresh canvas)">surprise me</button>
                 <label class="fresh" title="a look or Surprise clears the growth first"><input id="freshCanvas" type="checkbox" /><i class="led"></i>fresh canvas</label>
@@ -623,7 +626,7 @@
           <details class="sec panel step" id="sec-draw" open>
             <summary><i class="num">5</i><b>Draw a source</b><span class="hint">optional</span></summary>
             <div class="body">
-              <div class="intents" role="group" aria-label="Draw a source">
+              <div class="intents" role="group" aria-label="Draw a source" data-noreset>
                 <button id="srcTrace" type="button" aria-pressed="false" title="music draws along a picture's lines (asks for a picture when none is open)">trace details</button>
                 <button id="srcRelief" type="button" aria-pressed="false" title="music grows across a picture's relief (asks for a picture when none is open)">grow over relief</button>
                 <button id="srcModel" type="button" aria-pressed="false" title="music builds the surface of a 3D model (asks for one when none is loaded)">grow on 3D model</button>
@@ -763,7 +766,7 @@
 
           <details class="sec panel" id="sec-keys">
             <summary><b>Keys</b><span class="hint">shortcuts</span></summary>
-            <div class="body keys">
+            <div class="body keylist">
               <kbd>1</kbd>–<kbd>5</kbd> pattern · <kbd>Enter</kbd> perform · <kbd>F2</kbd> or <kbd>`</kbd> hide UI (<kbd>`</kbd>: the key left of <kbd>1</kbd>, no Fn needed on a Mac) · <kbd>Esc</kbd> show UI ·
               <kbd>Tab</kbd> next control · <kbd>Backspace</kbd> reset · <kbd>[</kbd> <kbd>]</kbd> palette · <kbd>Space</kbd> play/pause ·
               <kbd>↑</kbd><kbd>↓</kbd> zoom · <kbd>←</kbd><kbd>→</kbd> mirror folds ·
@@ -793,8 +796,9 @@
           <div id="status" class="lcd" role="status">…</div>
           <div id="hud" class="lcd" aria-label="Live readout"><b id="hudEngine"></b><span class="hz">·</span><span id="hudInput"></span><span class="hz">·</span>notes <b id="hudNotes">–</b><span class="hz">·</span><span id="meter"><i></i></span><span class="hz">·</span><b id="hudBpm">–</b> bpm<span class="wide"><span class="hz">·</span>zoom <b id="hudZoom">1.00</b></span><span class="hz">·</span><b id="hudFps">–</b> fps<span id="hudRec"></span><span class="wide"><span class="hz">·</span><span id="hudVer"></span></span></div>
         </div>
-        <div class="hints" aria-hidden="true">
-          <span><kbd>A</kbd>–<kbd>K</kbd>play</span><span><kbd>Enter</kbd>perform</span><span><kbd>R</kbd>rec</span><span><kbd>Q</kbd>still</span><span><kbd>C</kbd>camera</span><span><kbd>⌫</kbd>reset</span><span><kbd>F2</kbd>hide</span><span><kbd>⇧</kbd><kbd>1</kbd>–<kbd>8</kbd>presets</span>
+        <div class="keys" id="shortcuts" aria-hidden="true">
+          <span><kbd>A</kbd>–<kbd>K</kbd> play · <kbd>1</kbd>–<kbd>5</kbd> pattern · <kbd>shift</kbd>+<kbd>1</kbd>–<kbd>8</kbd> preset · <kbd>enter</kbd> perform · <kbd>R</kbd> rec · <kbd>Q</kbd> still · <kbd>C</kbd> camera · <kbd>V</kbd> lock · <kbd>⌫</kbd> reset · <kbd>F2</kbd> hide</span>
+          <span>right-click a setting resets it</span>
         </div>
       </main>
     </div>

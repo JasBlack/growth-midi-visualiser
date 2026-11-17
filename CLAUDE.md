@@ -54,7 +54,8 @@ src/midi/
   recorder.ts recordUi.ts     WebCodecs recorder (CFR, fixed capture size), Output panel logic
   looks.ts simpleUi.ts macros.ts   authored looks, Simple-mode card, macro knobs
   ui/                         dom.ts (LED-key state, fader fill) knob.ts (LED-ring knob over a range input)
-                              theme.ts (light/dark + baked dot grid) lookTiles.ts (look thumbnails) toast.ts
+                              theme.ts (light/dark) reset.ts (right-click a setting: back to its default)
+                              lookTiles.ts (look thumbnails) toast.ts
                               pianoKeys.ts (on-screen keyboard under the stage: touch/mouse, multi-finger, glissando)
   keys.ts panelSearch.ts storage.ts presets.ts synth.ts cast.ts vision.ts videoField.ts color.ts version.ts
 src/vision/                   MediaPipe face/hand landmarker wrapper
@@ -141,6 +142,16 @@ should go into `organism/` feature modules.
   palettes and env shaders are stored by index in presets/settings — never reorder; append new ones.
 - **Persistence:** `localStorage` keys `midiviz_settings_v3` and `midiviz_presets_v1`; writes go
   through `storage.ts` (never throws). Looks reset a base set of controls (`LOOK_BASE` in looks.ts).
+- **Family rules (Nov 2026):** one interface purple, `--accent2: #8b6cff` (knob LEDs, saved-preset
+  LEDs, CC tags, MIDI-learn glow; green `#39ff88` stays); palettes, look art and icons keep their own
+  colours. The case's dot grid is the family tile (16 px, a 32 px PNG per theme as `--dotgrid` in
+  index.html, never a CSS gradient). **Right-click any setting resets it**: registry widgets (faders,
+  knobs, switches, lists) go back to the control's default via `resetCtl` in main.ts and
+  **Shift+right-click stays MIDI learn**; every other setting (input mode, pattern, camera style, toggle
+  keys, selects, checkboxes) goes back to its state when the page loaded (`ui/reset.ts`). Looks, draw-a-
+  source intents, the easy|console switch, the seek bar and action keys keep the browser menu
+  (`data-noreset`). Under the stage, the family key-hint bar (`.keys`, as in Align): real shortcuts
+  only, hidden on touch phones and narrow screens. Numbered step badges stay: Growth has an easy mode.
 - **Versioning:** bump `src/midi/version.ts` AND `package.json` by hand per release; tag `vX.Y.Z`.
 - **GPU uploads:** instance data is uploaded via coalesced dirty ranges (`organism/uploads.ts`).
   Never call `clearUpdateRanges()` on ranges three hasn't uploaded yet — that bug made branches
